@@ -9,8 +9,104 @@
   <title>Expense Tracker</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💰%3C/text%3E%3C/svg%3E">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link rel="stylesheet" href="styles.css">
+  <style>
+    :root { --bg:#0f0f0f; --surface:#1a1a1a; --surface-light:#2a2a2a; --border:#333; --text:#fff; --text-secondary:#a0a0a0; --accent-yellow:#f59e0b; --accent-green:#10b981; --accent-red:#ef4444; --accent-blue:#3b82f6; --safe-top:env(safe-area-inset-top); --safe-bottom:env(safe-area-inset-bottom); }
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html,body { height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); overflow:hidden; }
+    #app { height:100%; position:relative; }
+    .screen { position:fixed; top:0; left:0; right:0; bottom:0; background:var(--bg); display:none; flex-direction:column; padding-top:var(--safe-top); padding-bottom:var(--safe-bottom); }
+    .screen.active { display:flex; }
+    .scroll-content { flex:1; overflow-y:auto; padding:16px; padding-bottom:100px; }
+    .app-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--border); }
+    .header-stats { display:flex; gap:24px; text-align:center; }
+    .stat-label { font-size:11px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; }
+    .stat-value { font-size:16px; font-weight:600; margin-top:2px; }
+    .stat-value.expense { color:var(--accent-red); }
+    .stat-value.income { color:var(--accent-green); }
+    .icon-btn { background:none; border:none; color:var(--text); font-size:20px; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+    .grid-section { margin-bottom:24px; }
+    .grid-section h3 { font-size:13px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px; padding-left:4px; }
+    .icon-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; }
+    .icon-item { display:flex; flex-direction:column; align-items:center; cursor:pointer; }
+    .icon-circle { width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:28px; background:var(--surface-light); border:2px solid transparent; transition:transform 0.1s; }
+    .icon-item:active .icon-circle { transform:scale(0.95); }
+    .account-item .icon-circle { background:rgba(245,158,11,0.15); border-color:var(--accent-yellow); }
+    .category-item .icon-circle { background:rgba(16,185,129,0.15); border-color:var(--accent-green); }
+    .income-item .icon-circle { background:rgba(59,130,246,0.15); border-color:var(--accent-blue); }
+    .add-btn .icon-circle { background:transparent; border:2px dashed var(--border); color:var(--text-secondary); font-size:24px; }
+    .icon-label { margin-top:6px; font-size:11px; color:var(--text-secondary); text-align:center; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .icon-amount { font-size:11px; margin-top:2px; font-weight:600; }
+    .account-item .icon-amount { color:var(--accent-yellow); }
+    .category-item .icon-amount { color:var(--accent-green); }
+    .fab { position:fixed; bottom:calc(24px + var(--safe-bottom)); right:24px; width:56px; height:56px; border-radius:50%; background:var(--accent-green); color:white; border:none; font-size:28px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.4); cursor:pointer; z-index:10; }
+    .calc-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--border); }
+    .calc-close, .calc-check { background:none; border:none; color:var(--text); font-size:22px; width:44px; height:44px; cursor:pointer; }
+    .calc-selectors { display:flex; align-items:center; gap:8px; font-size:15px; }
+    .calc-selectors button { background:none; border:none; color:var(--text-secondary); font-size:15px; cursor:pointer; padding:4px 8px; }
+    .calc-tags { display:flex; flex-wrap:wrap; gap:8px; padding:12px 16px; min-height:48px; }
+    .tag-pill { background:var(--surface-light); border:1px solid var(--border); color:var(--text-secondary); padding:4px 12px; border-radius:16px; font-size:13px; cursor:pointer; }
+    .tag-pill.active { background:var(--accent-blue); color:white; border-color:var(--accent-blue); }
+    .add-tag-btn { margin:0 16px 8px; background:none; border:1px dashed var(--border); color:var(--text-secondary); padding:6px 12px; border-radius:16px; font-size:13px; cursor:pointer; }
+    .calc-display { background:var(--surface); padding:20px 24px; text-align:right; }
+    .calc-amount-input { font-size:48px; font-weight:300; letter-spacing:-1px; display:flex; align-items:baseline; justify-content:flex-end; gap:8px; }
+    .calc-currency { font-size:20px; color:var(--text-secondary); font-weight:500; }
+    .calc-converted { font-size:16px; color:var(--text-secondary); margin-top:4px; height:24px; }
+    .calc-type-toggle { display:flex; padding:8px 16px; gap:8px; }
+    .type-btn { flex:1; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text-secondary); font-size:14px; font-weight:600; cursor:pointer; }
+    .type-btn.active[data-type="expense"] { background:rgba(239,68,68,0.15); color:var(--accent-red); border-color:var(--accent-red); }
+    .type-btn.active[data-type="income"] { background:rgba(16,185,129,0.15); color:var(--accent-green); border-color:var(--accent-green); }
+    .numpad { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; padding:16px; flex:1; }
+    .numpad-btn { border-radius:50%; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:24px; font-weight:300; display:flex; align-items:center; justify-content:center; aspect-ratio:1; cursor:pointer; }
+    .numpad-btn:active { background:var(--surface-light); }
+    .numpad-btn.utility { color:var(--text-secondary); font-size:20px; }
+    .calc-footer { display:flex; justify-content:space-around; padding:12px 16px calc(12px + var(--safe-bottom)); border-top:1px solid var(--border); background:var(--surface); }
+    .calc-footer button { background:none; border:none; color:var(--text-secondary); font-size:14px; cursor:pointer; padding:8px 16px; }
+    .list-header { display:flex; align-items:center; gap:8px; padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--border); }
+    .list-header h2 { font-size:17px; font-weight:600; flex:1; text-align:center; }
+    .filter-chips { flex:1; display:flex; gap:8px; overflow-x:auto; }
+    .chip { background:var(--accent-green); color:white; padding:4px 12px; border-radius:16px; font-size:13px; white-space:nowrap; display:flex; align-items:center; gap:4px; }
+    .chip button { background:none; border:none; color:white; font-size:14px; cursor:pointer; }
+    .list-total { padding:12px 16px; display:flex; justify-content:space-between; font-size:15px; border-bottom:1px solid var(--border); background:var(--surface); }
+    .date-group { margin-bottom:16px; }
+    .date-header { font-size:13px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; padding:12px 16px 8px; }
+    .transaction-item { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); cursor:pointer; }
+    .transaction-item:active { background:var(--surface-light); }
+    .tx-left { display:flex; flex-direction:column; gap:2px; }
+    .tx-account { font-size:13px; color:var(--text-secondary); }
+    .tx-category { font-size:16px; font-weight:500; }
+    .tx-tags { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+    .tx-right { text-align:right; }
+    .tx-amount { font-size:17px; font-weight:600; }
+    .tx-amount.expense { color:var(--accent-red); }
+    .tx-amount.income { color:var(--accent-green); }
+    .tx-converted { font-size:12px; color:var(--text-secondary); }
+    .form-content { padding:24px 16px; }
+    .form-group { margin-bottom:20px; }
+    .form-group label { display:block; font-size:13px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
+    .form-group input, .form-group select { width:100%; background:var(--surface-light); border:1px solid var(--border); color:var(--text); padding:14px 16px; border-radius:12px; font-size:16px; outline:none; }
+    .form-group input:focus, .form-group select:focus { border-color:var(--accent-green); }
+    .form-group small { display:block; margin-top:4px; font-size:12px; color:var(--text-secondary); }
+    .icon-picker { width:80px; height:80px; border-radius:50%; border:2px dashed var(--border); display:flex; align-items:center; justify-content:center; font-size:36px; margin:0 auto 24px; cursor:pointer; background:var(--surface-light); }
+    .btn-primary { width:100%; padding:16px; background:var(--accent-green); color:white; border:none; border-radius:12px; font-size:16px; font-weight:600; cursor:pointer; margin-top:8px; }
+    .btn-secondary { width:100%; padding:14px; background:var(--surface-light); color:var(--text); border:1px solid var(--border); border-radius:12px; font-size:15px; cursor:pointer; }
+    .report-filters { padding:16px; }
+    .filter-group { margin-bottom:16px; }
+    .multi-select { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+    .select-pill { padding:6px 14px; border-radius:16px; border:1px solid var(--border); background:var(--surface-light); color:var(--text-secondary); font-size:13px; cursor:pointer; }
+    .select-pill.selected { background:var(--accent-blue); color:white; border-color:var(--accent-blue); }
+    .modal { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); display:none; align-items:flex-end; justify-content:center; z-index:100; }
+    .modal.active { display:flex; }
+    .modal-content { background:var(--surface); width:100%; max-height:70%; border-radius:20px 20px 0 0; padding:20px 16px calc(20px + var(--safe-bottom)); overflow-y:auto; }
+    .modal-content h3 { text-align:center; margin-bottom:16px; font-size:17px; }
+    .picker-item { padding:14px 16px; border-bottom:1px solid var(--border); cursor:pointer; display:flex; align-items:center; gap:12px; }
+    .picker-item:active { background:var(--surface-light); }
+    .empty-state { text-align:center; padding:48px 24px; color:var(--text-secondary); }
+    .daily-total { text-align:right; padding:8px 16px; font-size:14px; font-weight:600; color:var(--text-secondary); border-bottom:1px solid var(--border); }
+    .report-summary { background:var(--surface-light); padding:16px; border-radius:12px; margin-bottom:16px; }
+    .report-summary-row { display:flex; justify-content:space-between; margin-bottom:8px; }
+    .report-summary-row:last-child { margin-bottom:0; }
+    #offline-banner { position:fixed; top:0; left:0; right:0; background:#f59e0b; color:#000; text-align:center; padding:8px; font-size:13px; font-weight:600; z-index:9999; }
+  </style>
 </head>
 <body>
   <div id="app">
@@ -19,22 +115,12 @@
       <header class="app-header">
         <button class="icon-btn" onclick="app.openSettings()">⚙️</button>
         <div class="header-stats">
-          <div>
-            <div class="stat-label">Balance</div>
-            <div class="stat-value" id="dash-balance">$0</div>
-          </div>
-          <div>
-            <div class="stat-label">Expenses</div>
-            <div class="stat-value expense" id="dash-expenses">$0</div>
-          </div>
-          <div>
-            <div class="stat-label">Income</div>
-            <div class="stat-value income" id="dash-income">$0</div>
-          </div>
+          <div><div class="stat-label">Balance</div><div class="stat-value" id="dash-balance">$0</div></div>
+          <div><div class="stat-label">Expenses</div><div class="stat-value expense" id="dash-expenses">$0</div></div>
+          <div><div class="stat-label">Income</div><div class="stat-value income" id="dash-income">$0</div></div>
         </div>
         <button class="icon-btn" onclick="app.openReports()">📊</button>
       </header>
-
       <div class="scroll-content">
         <section class="grid-section">
           <h3>Income</h3>
@@ -45,22 +131,19 @@
             </div>
           </div>
         </section>
-
         <section class="grid-section">
           <h3>Accounts</h3>
           <div class="icon-grid" id="accounts-grid"></div>
         </section>
-
         <section class="grid-section">
           <h3>Categories</h3>
           <div class="icon-grid" id="categories-grid"></div>
         </section>
       </div>
-
       <button class="fab" onclick="app.openCalculator()">＋</button>
     </div>
 
-    <!-- Calculator / Transaction Entry -->
+    <!-- Calculator -->
     <div id="screen-calculator" class="screen">
       <div class="calc-header">
         <button class="calc-close" onclick="app.showDashboard()">✕</button>
@@ -71,23 +154,16 @@
         </div>
         <button class="calc-check" onclick="app.saveTransaction()">✓</button>
       </div>
-
       <div class="calc-tags" id="calc-tags"></div>
       <button class="add-tag-btn" onclick="app.addTagPrompt()">+ Tag</button>
-
       <div class="calc-display">
-        <div class="calc-amount-input">
-          <span id="calc-amount">0</span>
-          <span class="calc-currency" id="calc-currency">USD</span>
-        </div>
+        <div class="calc-amount-input"><span id="calc-amount">0</span><span class="calc-currency" id="calc-currency">USD</span></div>
         <div class="calc-converted" id="calc-converted"></div>
       </div>
-
       <div class="calc-type-toggle">
         <button class="type-btn active" data-type="expense" onclick="app.setType('expense')">Expense</button>
         <button class="type-btn" data-type="income" onclick="app.setType('income')">Income</button>
       </div>
-
       <div class="numpad">
         <button class="numpad-btn utility" onclick="app.calcNote()">💬</button>
         <button class="numpad-btn utility" onclick="app.calcClear()">C</button>
@@ -110,7 +186,6 @@
         <button class="numpad-btn" onclick="app.calcBackspace()">⌫</button>
         <button class="numpad-btn utility" onclick="app.calcEquals()">＝</button>
       </div>
-
       <div class="calc-footer">
         <button onclick="app.setDate('yesterday')">Yesterday</button>
         <button onclick="app.setDate('today')" id="btn-today">Today</button>
@@ -136,26 +211,11 @@
         <h2>Reports</h2>
       </header>
       <div class="scroll-content report-filters">
-        <div class="filter-group">
-          <label>From</label>
-          <input type="date" id="report-from">
-        </div>
-        <div class="filter-group">
-          <label>To</label>
-          <input type="date" id="report-to">
-        </div>
-        <div class="filter-group">
-          <label>Accounts</label>
-          <div class="multi-select" id="report-accounts"></div>
-        </div>
-        <div class="filter-group">
-          <label>Categories</label>
-          <div class="multi-select" id="report-categories"></div>
-        </div>
-        <div class="filter-group">
-          <label>Tags</label>
-          <div class="multi-select" id="report-tags"></div>
-        </div>
+        <div class="filter-group"><label>From</label><input type="date" id="report-from"></div>
+        <div class="filter-group"><label>To</label><input type="date" id="report-to"></div>
+        <div class="filter-group"><label>Accounts</label><div class="multi-select" id="report-accounts"></div></div>
+        <div class="filter-group"><label>Categories</label><div class="multi-select" id="report-categories"></div></div>
+        <div class="filter-group"><label>Tags</label><div class="multi-select" id="report-tags"></div></div>
         <button class="btn-primary" onclick="app.runReport()">Generate Report</button>
         <div id="report-results"></div>
       </div>
@@ -177,16 +237,11 @@
           <label>Default Currency</label>
           <select id="setting-currency"></select>
         </div>
-        <div class="form-group">
-          <label>Exchange Rates</label>
-          <button class="btn-secondary" onclick="app.refreshRates()">Refresh Rates</button>
-          <small id="rates-status">Last updated: never</small>
-        </div>
         <button class="btn-primary" onclick="app.saveSettings()">Save Settings</button>
       </div>
     </div>
 
-    <!-- Form (Add/Edit Account or Category) -->
+    <!-- Form -->
     <div id="screen-form" class="screen">
       <header class="list-header">
         <button class="icon-btn" onclick="app.showDashboard()">✕</button>
@@ -195,40 +250,693 @@
       </header>
       <div class="scroll-content form-content">
         <div class="icon-picker" id="form-icon">📁</div>
-        <div class="form-group">
-          <label>Name</label>
-          <input type="text" id="form-name" placeholder="Enter name">
-        </div>
-        <div class="form-group" id="form-balance-group">
-          <label>Initial Balance</label>
-          <input type="number" id="form-balance" placeholder="0">
-        </div>
-        <div class="form-group">
-          <label>Currency</label>
-          <select id="form-currency"></select>
-        </div>
-        <input type="hidden" id="form-type">
-        <input type="hidden" id="form-id">
+        <div class="form-group"><label>Name</label><input type="text" id="form-name" placeholder="Enter name"></div>
+        <div class="form-group" id="form-balance-group"><label>Initial Balance</label><input type="number" id="form-balance" placeholder="0"></div>
+        <div class="form-group"><label>Currency</label><select id="form-currency"></select></div>
+        <input type="hidden" id="form-type"><input type="hidden" id="form-id">
       </div>
     </div>
 
     <!-- Pickers -->
     <div class="modal" id="picker-modal" onclick="if(event.target===this)app.closeModal()">
-      <div class="modal-content">
-        <h3 id="picker-title">Select</h3>
-        <div id="picker-list"></div>
-      </div>
+      <div class="modal-content"><h3 id="picker-title">Select</h3><div id="picker-list"></div></div>
     </div>
-
     <div class="modal" id="date-modal" onclick="if(event.target===this)app.closeModal()">
-      <div class="modal-content">
-        <h3>Select Date</h3>
-        <input type="date" id="modal-date-input">
-        <button class="btn-primary" onclick="app.confirmDate()">Done</button>
-      </div>
+      <div class="modal-content"><h3>Select Date</h3><input type="date" id="modal-date-input"><button class="btn-primary" onclick="app.confirmDate()">Done</button></div>
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script>
+    // Polyfill
+    if (!window.crypto || !crypto.randomUUID) {
+      window.crypto = window.crypto || {};
+      crypto.randomUUID = function() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+      };
+    }
+
+    // Storage
+    const storage = {
+      get(key, def) {
+        try {
+          const raw = localStorage.getItem('et_' + key);
+          return raw ? JSON.parse(raw) : (typeof def === 'undefined' ? null : def);
+        } catch (e) { return def; }
+      },
+      set(key, val) {
+        try { localStorage.setItem('et_' + key, JSON.stringify(val)); } catch (e) {}
+      }
+    };
+
+    const CURRENCIES = ['USD','EUR','GBP','MXN','RUB','AED','AUD','CAD','CHF','CNY','JPY','KRW','VND','THB','BRL','ARS','COP','PEN','CLP','BTC','ETH'];
+    const ICONS = ['💳','💵','🏦','📱','🚗','🏠','🍔','🛒','👗','✈️','🎮','💊','🎓','🐶','🎁','💼','🚕','🚌','🚲','⛽','🍺','☕','🍕','🥑','🏥','🦷','💇','🧴','🛍️','📚','🎬','🏋️','🎵','🌱','🔧','💡','🌐','📊','🏖️','🛏️','🧹','👶','🎄','🎂','❤️','⭐','🔥','⚡','🌙','🌞'];
+
+    const state = {
+      accounts: storage.get('accounts', []),
+      categories: storage.get('categories', []),
+      transactions: storage.get('transactions', []),
+      settings: storage.get('settings', { period_start_day: 1, default_currency: 'USD', exchange_rates: {} }),
+      rates: storage.get('rates', {}),
+      calc: { accountId: null, categoryId: null, amount: '0', currency: 'USD', type: 'expense', tags: [], date: new Date().toISOString().split('T')[0], note: '', editingId: null },
+      filters: { accountId: null, categoryId: null, tag: null, from: null, to: null },
+      reportFilters: { accounts: [], categories: [], tags: [], from: '', to: '' }
+    };
+
+    function formatMoney(amount, currency) {
+      if (typeof amount !== 'number') amount = parseFloat(amount) || 0;
+      const symbols = { USD:'$', EUR:'€', GBP:'£', MXN:'$', JPY:'¥', CNY:'¥', KRW:'₩', RUB:'₽', VND:'₫', THB:'฿', BRL:'R$', AED:'dh', CAD:'C$', AUD:'A$', CHF:'Fr', ARS:'$', COP:'$', PEN:'S/', CLP:'$', BTC:'₿', ETH:'Ξ' };
+      const sym = symbols[currency] || (currency + ' ');
+      return sym + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr + 'T00:00:00');
+      const today = new Date();
+      const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+      if (d.toDateString() === today.toDateString()) return 'Today';
+      if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+      return d.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function convertAmount(amount, from, to) {
+      if (from === to) return amount;
+      const r = state.rates || {};
+      if (!r[from] || !r[to]) return amount;
+      return (amount / r[from]) * r[to];
+    }
+
+    function getPeriodRange() {
+      const startDay = state.settings?.period_start_day || 1;
+      const today = new Date();
+      const day = today.getDate();
+      let start, end;
+      if (day >= startDay) {
+        start = new Date(today.getFullYear(), today.getMonth(), startDay);
+        end = new Date(today.getFullYear(), today.getMonth() + 1, startDay - 1);
+      } else {
+        start = new Date(today.getFullYear(), today.getMonth() - 1, startDay);
+        end = new Date(today.getFullYear(), today.getMonth(), startDay - 1);
+      }
+      start.setHours(0,0,0,0);
+      end.setHours(23,59,59,999);
+      return { start, end };
+    }
+
+    function showScreen(name) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      const el = document.getElementById('screen-' + name);
+      if (el) el.classList.add('active');
+      window.scrollTo(0, 0);
+    }
+
+    function saveState() {
+      storage.set('accounts', state.accounts);
+      storage.set('categories', state.categories);
+      storage.set('transactions', state.transactions);
+      storage.set('settings', state.settings);
+      storage.set('rates', state.rates);
+    }
+
+    function populateCurrencySelects() {
+      document.querySelectorAll('select').forEach(sel => {
+        if (sel.id && sel.id.includes('currency')) {
+          sel.innerHTML = CURRENCIES.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+      });
+    }
+
+    function renderDashboard() {
+      const period = getPeriodRange();
+      const periodTx = state.transactions.filter(t => {
+        const d = new Date(t.date + 'T00:00:00');
+        return d >= period.start && d <= period.end;
+      });
+
+      const income = periodTx.filter(t => t.type === 'income').reduce((s, t) => s + (t.converted_amount || t.amount), 0);
+      const expenses = periodTx.filter(t => t.type === 'expense').reduce((s, t) => s + (t.converted_amount || t.amount), 0);
+      const balance = state.accounts.reduce((s, a) => s + convertAmount(a.balance || 0, a.currency || 'USD', state.settings?.default_currency || 'USD'), 0);
+
+      const balEl = document.getElementById('dash-balance');
+      const expEl = document.getElementById('dash-expenses');
+      const incEl = document.getElementById('dash-income');
+      if (balEl) balEl.textContent = formatMoney(balance, state.settings?.default_currency || 'USD');
+      if (expEl) expEl.textContent = formatMoney(expenses, state.settings?.default_currency || 'USD');
+      if (incEl) incEl.textContent = formatMoney(income, state.settings?.default_currency || 'USD');
+
+      const accGrid = document.getElementById('accounts-grid');
+      if (accGrid) {
+        let html = state.accounts.map(a => `
+          <div class="icon-item account-item" onclick="app.openList('account','${a.id}')">
+            <div class="icon-circle">${a.icon || '💳'}</div>
+            <span class="icon-label">${a.name.replace(/</g,'&lt;')}</span>
+            <span class="icon-amount">${formatMoney(a.balance || 0, a.currency || 'USD')}</span>
+          </div>
+        `).join('');
+        html += `
+          <div class="icon-item add-btn" onclick="app.openForm('account')">
+            <div class="icon-circle">＋</div>
+            <span class="icon-label">Add</span>
+          </div>
+        `;
+        accGrid.innerHTML = html;
+      }
+
+      const catGrid = document.getElementById('categories-grid');
+      if (catGrid) {
+        const catTotals = {};
+        periodTx.filter(t => t.type === 'expense').forEach(t => {
+          catTotals[t.category_id] = (catTotals[t.category_id] || 0) + (t.converted_amount || t.amount);
+        });
+        let html = state.categories.map(c => `
+          <div class="icon-item category-item" onclick="app.openList('category','${c.id}')">
+            <div class="icon-circle">${c.icon || '📁'}</div>
+            <span class="icon-label">${c.name.replace(/</g,'&lt;')}</span>
+            <span class="icon-amount">${formatMoney(catTotals[c.id] || 0, state.settings?.default_currency || 'USD')}</span>
+          </div>
+        `).join('');
+        html += `
+          <div class="icon-item add-btn" onclick="app.openForm('category')">
+            <div class="icon-circle">＋</div>
+            <span class="icon-label">Add</span>
+          </div>
+        `;
+        catGrid.innerHTML = html;
+      }
+    }
+
+    function openCalculator(typeOrIncome, preselectId) {
+      const defCurrency = state.settings?.default_currency || 'USD';
+      state.calc = {
+        accountId: state.accounts[0]?.id || null,
+        categoryId: state.categories[0]?.id || null,
+        amount: '0',
+        currency: defCurrency,
+        type: 'expense',
+        tags: [],
+        date: new Date().toISOString().split('T')[0],
+        note: '',
+        editingId: null
+      };
+      if (typeOrIncome === 'income') state.calc.type = 'income';
+      if (preselectId && typeOrIncome === 'account') {
+        state.calc.accountId = preselectId;
+        const acc = state.accounts.find(a => a.id === preselectId);
+        if (acc) state.calc.currency = acc.currency || defCurrency;
+      }
+      if (preselectId && typeOrIncome === 'category') {
+        state.calc.categoryId = preselectId;
+        const cat = state.categories.find(c => c.id === preselectId);
+        if (cat) state.calc.currency = cat.currency || defCurrency;
+      }
+      updateCalcUI();
+      showScreen('calculator');
+    }
+
+    function editTransaction(id) {
+      const t = state.transactions.find(x => x.id === id);
+      if (!t) return;
+      state.calc = {
+        accountId: t.account_id,
+        categoryId: t.category_id,
+        amount: t.amount.toString(),
+        currency: t.currency,
+        type: t.type,
+        tags: Array.isArray(t.tags) ? [...t.tags] : [],
+        date: t.date,
+        note: t.note || '',
+        editingId: t.id
+      };
+      updateCalcUI();
+      showScreen('calculator');
+    }
+
+    function updateCalcUI() {
+      const acc = state.accounts.find(a => a.id === state.calc.accountId);
+      const cat = state.categories.find(c => c.id === state.calc.categoryId);
+      const accBtn = document.getElementById('calc-account-btn');
+      const catBtn = document.getElementById('calc-category-btn');
+      if (accBtn) accBtn.textContent = acc?.name || 'Account';
+      if (catBtn) catBtn.textContent = cat?.name || 'Category';
+      const amtEl = document.getElementById('calc-amount');
+      const curEl = document.getElementById('calc-currency');
+      if (amtEl) amtEl.textContent = state.calc.amount;
+      if (curEl) curEl.textContent = state.calc.currency;
+      const dateLabel = document.getElementById('calc-date-label');
+      if (dateLabel) dateLabel.textContent = state.calc.date;
+      document.querySelectorAll('.type-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.type === state.calc.type);
+      });
+      const converted = convertAmount(parseFloat(state.calc.amount) || 0, state.calc.currency, state.settings?.default_currency || 'USD');
+      const convEl = document.getElementById('calc-converted');
+      if (convEl) {
+        convEl.textContent = (state.calc.currency !== (state.settings?.default_currency || 'USD'))
+          ? `≈ ${formatMoney(converted, state.settings?.default_currency || 'USD')}` : '';
+      }
+      const tagContainer = document.getElementById('calc-tags');
+      if (tagContainer) {
+        const allTags = getAllTags();
+        tagContainer.innerHTML = allTags.map(tag => `
+          <span class="tag-pill ${state.calc.tags.includes(tag) ? 'active' : ''}" onclick="app.toggleTag('${tag}')">${tag.replace(/</g,'&lt;')}</span>
+        `).join('');
+      }
+    }
+
+    function getAllTags() {
+      const tags = new Set();
+      state.transactions.forEach(t => {
+        if (Array.isArray(t.tags)) t.tags.forEach(tag => tags.add(tag));
+      });
+      return Array.from(tags).sort();
+    }
+
+    function toggleTag(tag) {
+      if (state.calc.tags.includes(tag)) state.calc.tags = state.calc.tags.filter(t => t !== tag);
+      else state.calc.tags.push(tag);
+      updateCalcUI();
+    }
+
+    function addTagPrompt() {
+      const tag = prompt('Enter tag name:');
+      if (tag && tag.trim()) {
+        const clean = tag.trim().toLowerCase().replace(/\s+/g, '-');
+        if (!state.calc.tags.includes(clean)) state.calc.tags.push(clean);
+        updateCalcUI();
+      }
+    }
+
+    function setType(type) {
+      state.calc.type = type;
+      updateCalcUI();
+    }
+
+    function calcDigit(d) {
+      if (state.calc.amount === '0') state.calc.amount = d.toString();
+      else state.calc.amount += d;
+      updateCalcUI();
+    }
+
+    function calcDecimal() {
+      if (!state.calc.amount.includes('.')) state.calc.amount += '.';
+      updateCalcUI();
+    }
+
+    function calcBackspace() {
+      state.calc.amount = state.calc.amount.slice(0, -1) || '0';
+      updateCalcUI();
+    }
+
+    function calcClear() {
+      state.calc.amount = '0';
+      calcOpBuffer = null;
+      updateCalcUI();
+    }
+
+    let calcOpBuffer = null;
+    function calcOp(op) {
+      calcOpBuffer = { amount: parseFloat(state.calc.amount) || 0, op };
+      state.calc.amount = '0';
+    }
+
+    function calcPercent() {
+      state.calc.amount = ((parseFloat(state.calc.amount) || 0) * 0.01).toString();
+      updateCalcUI();
+    }
+
+    function calcEquals() {
+      if (!calcOpBuffer) return;
+      const current = parseFloat(state.calc.amount) || 0;
+      let result = 0;
+      switch (calcOpBuffer.op) {
+        case '+': result = calcOpBuffer.amount + current; break;
+        case '-': result = calcOpBuffer.amount - current; break;
+        case '×': result = calcOpBuffer.amount * current; break;
+        case '÷': result = calcOpBuffer.amount / current; break;
+      }
+      state.calc.amount = parseFloat(result.toFixed(2)).toString();
+      calcOpBuffer = null;
+      updateCalcUI();
+    }
+
+    function calcNote() {
+      const note = prompt('Note:', state.calc.note);
+      if (note !== null) state.calc.note = note;
+    }
+
+    function setDate(when) {
+      const d = new Date();
+      if (when === 'yesterday') d.setDate(d.getDate() - 1);
+      state.calc.date = d.toISOString().split('T')[0];
+      updateCalcUI();
+    }
+
+    function showDatePicker() {
+      const input = document.getElementById('modal-date-input');
+      if (input) input.value = state.calc.date;
+      const modal = document.getElementById('date-modal');
+      if (modal) modal.classList.add('active');
+    }
+
+    function confirmDate() {
+      const input = document.getElementById('modal-date-input');
+      if (input) state.calc.date = input.value;
+      closeModal();
+      updateCalcUI();
+    }
+
+    function saveTransaction() {
+      const amount = parseFloat(state.calc.amount);
+      if (!amount || amount <= 0) { alert('Enter amount'); return; }
+      if (!state.calc.accountId) { alert('Select account'); return; }
+      if (!state.calc.categoryId) { alert('Select category'); return; }
+
+      const converted = convertAmount(amount, state.calc.currency, state.settings?.default_currency || 'USD');
+      const id = state.calc.editingId || crypto.randomUUID();
+
+      const data = {
+        id: id,
+        account_id: state.calc.accountId,
+        category_id: state.calc.categoryId,
+        amount: amount,
+        currency: state.calc.currency,
+        converted_amount: converted,
+        type: state.calc.type,
+        tags: state.calc.tags,
+        date: state.calc.date,
+        note: state.calc.note,
+        created_at: new Date().toISOString()
+      };
+
+      if (state.calc.editingId) {
+        const idx = state.transactions.findIndex(t => t.id === state.calc.editingId);
+        if (idx >= 0) state.transactions[idx] = data;
+      } else {
+        state.transactions.unshift(data);
+      }
+
+      const acc = state.accounts.find(a => a.id === state.calc.accountId);
+      if (acc) {
+        const oldTx = state.calc.editingId ? state.transactions.find(t => t.id === state.calc.editingId) : null;
+        let change = state.calc.type === 'income' ? amount : -amount;
+        if (oldTx && oldTx.account_id === acc.id) {
+          const oldChange = oldTx.type === 'income' ? oldTx.amount : -oldTx.amount;
+          acc.balance = (acc.balance || 0) - oldChange + change;
+        } else {
+          acc.balance = (acc.balance || 0) + change;
+        }
+      }
+
+      saveState();
+      renderDashboard();
+      showScreen('dashboard');
+    }
+
+    function openList(filterType, id) {
+      state.filters = { accountId: null, categoryId: null, tag: null, from: null, to: null };
+      if (filterType === 'account') state.filters.accountId = id;
+      if (filterType === 'category') state.filters.categoryId = id;
+      renderList();
+      showScreen('list');
+    }
+
+    function renderList() {
+      let txs = [...state.transactions];
+      if (state.filters.accountId) txs = txs.filter(t => t.account_id === state.filters.accountId);
+      if (state.filters.categoryId) txs = txs.filter(t => t.category_id === state.filters.categoryId);
+      if (state.filters.tag) txs = txs.filter(t => (t.tags || []).includes(state.filters.tag));
+      if (state.filters.from) txs = txs.filter(t => t.date >= state.filters.from);
+      if (state.filters.to) txs = txs.filter(t => t.date <= state.filters.to);
+
+      const chips = document.getElementById('filter-chips');
+      if (chips) {
+        const html = [];
+        if (state.filters.accountId) {
+          const a = state.accounts.find(x => x.id === state.filters.accountId);
+          html.push(`<span class="chip">${(a?.name || '').replace(/</g,'&lt;')} <button onclick="app.clearFilter('account')">×</button></span>`);
+        }
+        if (state.filters.categoryId) {
+          const c = state.categories.find(x => x.id === state.filters.categoryId);
+          html.push(`<span class="chip">${(c?.name || '').replace(/</g,'&lt;')} <button onclick="app.clearFilter('category')">×</button></span>`);
+        }
+        chips.innerHTML = html.join('') || '<span style="color:var(--text-secondary);font-size:13px;">All transactions</span>';
+      }
+
+      const total = txs.reduce((s, t) => s + (t.type === 'income' ? 1 : -1) * (t.converted_amount || t.amount), 0);
+      const totalEl = document.getElementById('list-total');
+      if (totalEl) {
+        totalEl.innerHTML = `<span>TOTAL</span><span class="amount" style="color:${total >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">${formatMoney(Math.abs(total), state.settings?.default_currency || 'USD')}</span>`;
+      }
+
+      const groups = {};
+      txs.forEach(t => { if (!groups[t.date]) groups[t.date] = []; groups[t.date].push(t); });
+      const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+      const container = document.getElementById('transaction-list');
+      if (!container) return;
+      if (sortedDates.length === 0) {
+        container.innerHTML = '<div class="empty-state">No transactions</div>';
+        return;
+      }
+
+      container.innerHTML = sortedDates.map(date => {
+        const dayTxs = groups[date];
+        const dayTotal = dayTxs.reduce((s, t) => s + (t.type === 'income' ? 1 : -1) * (t.converted_amount || t.amount), 0);
+        return `
+          <div class="date-group">
+            <div class="date-header">${formatDate(date)}</div>
+            ${dayTxs.map(t => renderTxItem(t)).join('')}
+            <div class="daily-total">Total: ${formatMoney(Math.abs(dayTotal), state.settings?.default_currency || 'USD')}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTxItem(t) {
+      const acc = state.accounts.find(a => a.id === t.account_id);
+      const cat = state.categories.find(c => c.id === t.category_id);
+      const isExp = t.type === 'expense';
+      return `
+        <div class="transaction-item" onclick="app.editTransaction('${t.id}')">
+          <div class="tx-left">
+            <span class="tx-account">${(acc?.name || 'Unknown').replace(/</g,'&lt;')}</span>
+            <span class="tx-category">${(cat?.name || 'Unknown').replace(/</g,'&lt;')}</span>
+            ${(t.tags && t.tags.length) ? `<span class="tx-tags">${t.tags.map(tag => '#' + tag.replace(/</g,'&lt;')).join(' ')}</span>` : ''}
+          </div>
+          <div class="tx-right">
+            <div class="tx-amount ${isExp ? 'expense' : 'income'}">${isExp ? '-' : '+'}${formatMoney(t.amount, t.currency)}</div>
+            ${t.converted_amount && t.currency !== (state.settings?.default_currency || 'USD') ? `<div class="tx-converted">≈ ${formatMoney(t.converted_amount, state.settings?.default_currency || 'USD')}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function clearFilter(type) {
+      if (type === 'account') state.filters.accountId = null;
+      if (type === 'category') state.filters.categoryId = null;
+      renderList();
+    }
+
+    function showDateRangePicker() {
+      const from = prompt('From date (YYYY-MM-DD):', state.filters.from || '');
+      if (from === null) return;
+      const to = prompt('To date (YYYY-MM-DD):', state.filters.to || '');
+      if (to === null) return;
+      state.filters.from = from || null;
+      state.filters.to = to || null;
+      renderList();
+    }
+
+    function openReports() {
+      const accContainer = document.getElementById('report-accounts');
+      if (accContainer) accContainer.innerHTML = state.accounts.map(a => `<span class="select-pill" onclick="app.toggleReportFilter('accounts','${a.id}',this)">${a.name.replace(/</g,'&lt;')}</span>`).join('');
+      const catContainer = document.getElementById('report-categories');
+      if (catContainer) catContainer.innerHTML = state.categories.map(c => `<span class="select-pill" onclick="app.toggleReportFilter('categories','${c.id}',this)">${c.name.replace(/</g,'&lt;')}</span>`).join('');
+      const allTags = getAllTags();
+      const tagContainer = document.getElementById('report-tags');
+      if (tagContainer) tagContainer.innerHTML = allTags.map(tag => `<span class="select-pill" onclick="app.toggleReportFilter('tags','${tag}',this)">#${tag.replace(/</g,'&lt;')}</span>`).join('');
+      const period = getPeriodRange();
+      const fromInput = document.getElementById('report-from');
+      const toInput = document.getElementById('report-to');
+      if (fromInput) fromInput.value = period.start.toISOString().split('T')[0];
+      if (toInput) toInput.value = period.end.toISOString().split('T')[0];
+      const results = document.getElementById('report-results');
+      if (results) results.innerHTML = '';
+      showScreen('reports');
+    }
+
+    function toggleReportFilter(type, value, el) {
+      const arr = state.reportFilters[type];
+      if (arr.includes(value)) {
+        arr.splice(arr.indexOf(value), 1);
+        el.classList.remove('selected');
+      } else {
+        arr.push(value);
+        el.classList.add('selected');
+      }
+    }
+
+    function runReport() {
+      const from = document.getElementById('report-from')?.value;
+      const to = document.getElementById('report-to')?.value;
+      if (!from || !to) return;
+      let txs = state.transactions.filter(t => t.date >= from && t.date <= to);
+      if (state.reportFilters.accounts.length) txs = txs.filter(t => state.reportFilters.accounts.includes(t.account_id));
+      if (state.reportFilters.categories.length) txs = txs.filter(t => state.reportFilters.categories.includes(t.category_id));
+      if (state.reportFilters.tags.length) txs = txs.filter(t => state.reportFilters.tags.some(tag => (t.tags || []).includes(tag)));
+      const income = txs.filter(t => t.type === 'income').reduce((s, t) => s + (t.converted_amount || t.amount), 0);
+      const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + (t.converted_amount || t.amount), 0);
+      const results = document.getElementById('report-results');
+      if (!results) return;
+      results.innerHTML = `
+        <div class="report-summary">
+          <div class="report-summary-row"><span>Transactions</span><span>${txs.length}</span></div>
+          <div class="report-summary-row"><span>Income</span><span style="color:var(--accent-green)">${formatMoney(income, state.settings?.default_currency || 'USD')}</span></div>
+          <div class="report-summary-row"><span>Expenses</span><span style="color:var(--accent-red)">${formatMoney(expenses, state.settings?.default_currency || 'USD')}</span></div>
+          <div class="report-summary-row"><span>Net</span><span style="color:${income >= expenses ? 'var(--accent-green)' : 'var(--accent-red)'}">${formatMoney(income - expenses, state.settings?.default_currency || 'USD')}</span></div>
+        </div>
+        ${txs.length ? txs.map(t => renderTxItem(t)).join('') : '<div class="empty-state">No results</div>'}
+      `;
+    }
+
+    function openSettings() {
+      const dayInput = document.getElementById('setting-period-day');
+      const curInput = document.getElementById('setting-currency');
+      if (dayInput) dayInput.value = state.settings?.period_start_day || 1;
+      if (curInput) curInput.value = state.settings?.default_currency || 'USD';
+      showScreen('settings');
+    }
+
+    function saveSettings() {
+      const day = parseInt(document.getElementById('setting-period-day')?.value) || 1;
+      const currency = document.getElementById('setting-currency')?.value || 'USD';
+      state.settings = { ...(state.settings || {}), period_start_day: day, default_currency: currency };
+      saveState();
+      renderDashboard();
+      showScreen('dashboard');
+    }
+
+    function openForm(type, id) {
+      document.getElementById('form-type').value = type;
+      document.getElementById('form-id').value = id || '';
+      document.getElementById('form-title').textContent = id ? 'Edit' : 'Add ' + type;
+      document.getElementById('form-name').value = '';
+      document.getElementById('form-balance').value = '';
+      document.getElementById('form-icon').textContent = type === 'account' ? '💳' : '📁';
+      document.getElementById('form-currency').value = state.settings?.default_currency || 'USD';
+      document.getElementById('form-balance-group').style.display = type === 'category' ? 'none' : 'block';
+      if (id) {
+        const item = type === 'account' ? state.accounts.find(a => a.id === id) : state.categories.find(c => c.id === id);
+        if (item) {
+          document.getElementById('form-name').value = item.name;
+          document.getElementById('form-icon').textContent = item.icon || (type === 'account' ? '💳' : '📁');
+          document.getElementById('form-currency').value = item.currency || state.settings?.default_currency || 'USD';
+          if (type === 'account') document.getElementById('form-balance').value = item.balance || 0;
+        }
+      }
+      showScreen('form');
+    }
+
+    function saveForm() {
+      const type = document.getElementById('form-type').value;
+      const id = document.getElementById('form-id').value;
+      const name = document.getElementById('form-name').value.trim();
+      const icon = document.getElementById('form-icon').textContent;
+      const currency = document.getElementById('form-currency').value;
+      if (!name) { alert('Enter name'); return; }
+      const isEdit = !!id;
+      const itemId = id || crypto.randomUUID();
+      const data = { id: itemId, name, icon, currency, created_at: new Date().toISOString() };
+      if (type === 'account') {
+        data.balance = parseFloat(document.getElementById('form-balance').value) || 0;
+        if (isEdit) {
+          const idx = state.accounts.findIndex(a => a.id === id);
+          if (idx >= 0) state.accounts[idx] = { ...state.accounts[idx], ...data };
+        } else {
+          state.accounts.push(data);
+        }
+      } else {
+        if (isEdit) {
+          const idx = state.categories.findIndex(c => c.id === id);
+          if (idx >= 0) state.categories[idx] = { ...state.categories[idx], ...data };
+        } else {
+          state.categories.push(data);
+        }
+      }
+      saveState();
+      renderDashboard();
+      showScreen('dashboard');
+    }
+
+    function showAccountPicker() {
+      const items = state.accounts.map(a => ({
+        icon: a.icon || '💳',
+        label: a.name,
+        action: () => { state.calc.accountId = a.id; state.calc.currency = a.currency || state.settings?.default_currency || 'USD'; updateCalcUI(); }
+      }));
+      showPicker('Select Account', items);
+    }
+
+    function showCategoryPicker() {
+      const items = state.categories.map(c => ({
+        icon: c.icon || '📁',
+        label: c.name,
+        action: () => { state.calc.categoryId = c.id; updateCalcUI(); }
+      }));
+      showPicker('Select Category', items);
+    }
+
+    function showPicker(title, items) {
+      document.getElementById('picker-title').textContent = title;
+      document.getElementById('picker-list').innerHTML = items.map((item, i) => `
+        <div class="picker-item" onclick="app.pickerAction(${i})">
+          <span style="font-size:24px">${item.icon}</span>
+          <span>${item.label.replace(/</g,'&lt;')}</span>
+        </div>
+      `).join('');
+      window._pickerActions = items.map(i => i.action);
+      document.getElementById('picker-modal').classList.add('active');
+    }
+
+    function pickerAction(index) {
+      if (window._pickerActions && window._pickerActions[index]) window._pickerActions[index]();
+      closeModal();
+    }
+
+    function closeModal() {
+      document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+    }
+
+    // Icon picker
+    document.getElementById('form-icon').addEventListener('click', () => {
+      const html = ICONS.map(ic => `<div class="picker-item" onclick="document.getElementById('form-icon').textContent='${ic}';app.closeModal()"><span style="font-size:28px">${ic}</span></div>`).join('');
+      document.getElementById('picker-title').textContent = 'Choose Icon';
+      document.getElementById('picker-list').innerHTML = html;
+      document.getElementById('picker-modal').classList.add('active');
+    });
+
+    // Init
+    document.addEventListener('DOMContentLoaded', () => {
+      populateCurrencySelects();
+      renderDashboard();
+      fetch('https://open.er-api.com/v6/latest/USD')
+        .then(r => r.json())
+        .then(data => { if (data.rates) { state.rates = data.rates; storage.set('rates', state.rates); renderDashboard(); }})
+        .catch(() => {});
+    });
+
+    window.app = {
+      showDashboard: () => { renderDashboard(); showScreen('dashboard'); },
+      openCalculator, editTransaction, setType, toggleTag, addTagPrompt,
+      calcDigit, calcDecimal, calcBackspace, calcClear, calcOp, calcPercent, calcEquals, calcNote,
+      setDate, showDatePicker, confirmDate, saveTransaction,
+      openList, clearFilter, showDateRangePicker,
+      openReports, toggleReportFilter, runReport,
+      openSettings, saveSettings,
+      openForm, saveForm,
+      showAccountPicker, showCategoryPicker, closeModal, pickerAction
+    };
+  </script>
 </body>
 </html>
