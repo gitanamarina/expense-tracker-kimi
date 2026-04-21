@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f0f0f">
+  <title>Expense Tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💰%3C/text%3E%3C/svg%3E">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Dashboard -->
+    <div id="screen-dashboard" class="screen active">
+      <header class="app-header">
+        <button class="icon-btn" onclick="app.openSettings()">⚙️</button>
+        <div class="header-stats">
+          <div>
+            <div class="stat-label">Balance</div>
+            <div class="stat-value" id="dash-balance">$0</div>
+          </div>
+          <div>
+            <div class="stat-label">Expenses</div>
+            <div class="stat-value expense" id="dash-expenses">$0</div>
+          </div>
+          <div>
+            <div class="stat-label">Income</div>
+            <div class="stat-value income" id="dash-income">$0</div>
+          </div>
+        </div>
+        <button class="icon-btn" onclick="app.openReports()">📊</button>
+      </header>
+
+      <div class="scroll-content">
+        <section class="grid-section">
+          <h3>Income</h3>
+          <div class="icon-grid" id="income-grid">
+            <div class="icon-item income-item" onclick="app.openCalculator('income')">
+              <div class="icon-circle income-bg">💵</div>
+              <span class="icon-label">Add Income</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="grid-section">
+          <h3>Accounts</h3>
+          <div class="icon-grid" id="accounts-grid"></div>
+        </section>
+
+        <section class="grid-section">
+          <h3>Categories</h3>
+          <div class="icon-grid" id="categories-grid"></div>
+        </section>
+      </div>
+
+      <button class="fab" onclick="app.openCalculator()">＋</button>
+    </div>
+
+    <!-- Calculator / Transaction Entry -->
+    <div id="screen-calculator" class="screen">
+      <div class="calc-header">
+        <button class="calc-close" onclick="app.showDashboard()">✕</button>
+        <div class="calc-selectors">
+          <button id="calc-account-btn" onclick="app.showAccountPicker()">Account</button>
+          <span>›</span>
+          <button id="calc-category-btn" onclick="app.showCategoryPicker()">Category</button>
+        </div>
+        <button class="calc-check" onclick="app.saveTransaction()">✓</button>
+      </div>
+
+      <div class="calc-tags" id="calc-tags"></div>
+      <button class="add-tag-btn" onclick="app.addTagPrompt()">+ Tag</button>
+
+      <div class="calc-display">
+        <div class="calc-amount-input">
+          <span id="calc-amount">0</span>
+          <span class="calc-currency" id="calc-currency">USD</span>
+        </div>
+        <div class="calc-converted" id="calc-converted"></div>
+      </div>
+
+      <div class="calc-type-toggle">
+        <button class="type-btn active" data-type="expense" onclick="app.setType('expense')">Expense</button>
+        <button class="type-btn" data-type="income" onclick="app.setType('income')">Income</button>
+      </div>
+
+      <div class="numpad">
+        <button class="numpad-btn utility" onclick="app.calcNote()">💬</button>
+        <button class="numpad-btn utility" onclick="app.calcClear()">C</button>
+        <button class="numpad-btn utility" onclick="app.calcPercent()">％</button>
+        <button class="numpad-btn utility" onclick="app.calcOp('+')">＋</button>
+        <button class="numpad-btn" onclick="app.calcDigit(1)">1</button>
+        <button class="numpad-btn" onclick="app.calcDigit(2)">2</button>
+        <button class="numpad-btn" onclick="app.calcDigit(3)">3</button>
+        <button class="numpad-btn utility" onclick="app.calcOp('-')">−</button>
+        <button class="numpad-btn" onclick="app.calcDigit(4)">4</button>
+        <button class="numpad-btn" onclick="app.calcDigit(5)">5</button>
+        <button class="numpad-btn" onclick="app.calcDigit(6)">6</button>
+        <button class="numpad-btn utility" onclick="app.calcOp('×')">×</button>
+        <button class="numpad-btn" onclick="app.calcDigit(7)">7</button>
+        <button class="numpad-btn" onclick="app.calcDigit(8)">8</button>
+        <button class="numpad-btn" onclick="app.calcDigit(9)">9</button>
+        <button class="numpad-btn utility" onclick="app.calcOp('÷')">÷</button>
+        <button class="numpad-btn" onclick="app.calcDecimal()">,</button>
+        <button class="numpad-btn" onclick="app.calcDigit(0)">0</button>
+        <button class="numpad-btn" onclick="app.calcBackspace()">⌫</button>
+        <button class="numpad-btn utility" onclick="app.calcEquals()">＝</button>
+      </div>
+
+      <div class="calc-footer">
+        <button onclick="app.setDate('yesterday')">Yesterday</button>
+        <button onclick="app.setDate('today')" id="btn-today">Today</button>
+        <button onclick="app.showDatePicker()">📅 <span id="calc-date-label"></span></button>
+      </div>
+    </div>
+
+    <!-- Transaction List -->
+    <div id="screen-list" class="screen">
+      <header class="list-header">
+        <button class="icon-btn" onclick="app.showDashboard()">←</button>
+        <div class="filter-chips" id="filter-chips"></div>
+        <button class="icon-btn" onclick="app.showDateRangePicker()">📅</button>
+      </header>
+      <div class="list-total" id="list-total"></div>
+      <div class="scroll-content" id="transaction-list"></div>
+    </div>
+
+    <!-- Reports -->
+    <div id="screen-reports" class="screen">
+      <header class="list-header">
+        <button class="icon-btn" onclick="app.showDashboard()">←</button>
+        <h2>Reports</h2>
+      </header>
+      <div class="scroll-content report-filters">
+        <div class="filter-group">
+          <label>From</label>
+          <input type="date" id="report-from">
+        </div>
+        <div class="filter-group">
+          <label>To</label>
+          <input type="date" id="report-to">
+        </div>
+        <div class="filter-group">
+          <label>Accounts</label>
+          <div class="multi-select" id="report-accounts"></div>
+        </div>
+        <div class="filter-group">
+          <label>Categories</label>
+          <div class="multi-select" id="report-categories"></div>
+        </div>
+        <div class="filter-group">
+          <label>Tags</label>
+          <div class="multi-select" id="report-tags"></div>
+        </div>
+        <button class="btn-primary" onclick="app.runReport()">Generate Report</button>
+        <div id="report-results"></div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div id="screen-settings" class="screen">
+      <header class="list-header">
+        <button class="icon-btn" onclick="app.showDashboard()">←</button>
+        <h2>Settings</h2>
+      </header>
+      <div class="scroll-content settings-form">
+        <div class="form-group">
+          <label>Period Start Day</label>
+          <input type="number" id="setting-period-day" min="1" max="31" value="1">
+          <small>Day of month when your budget period starts</small>
+        </div>
+        <div class="form-group">
+          <label>Default Currency</label>
+          <select id="setting-currency"></select>
+        </div>
+        <div class="form-group">
+          <label>Exchange Rates</label>
+          <button class="btn-secondary" onclick="app.refreshRates()">Refresh Rates</button>
+          <small id="rates-status">Last updated: never</small>
+        </div>
+        <button class="btn-primary" onclick="app.saveSettings()">Save Settings</button>
+      </div>
+    </div>
+
+    <!-- Form (Add/Edit Account or Category) -->
+    <div id="screen-form" class="screen">
+      <header class="list-header">
+        <button class="icon-btn" onclick="app.showDashboard()">✕</button>
+        <h2 id="form-title">Add</h2>
+        <button class="icon-btn" onclick="app.saveForm()">✓</button>
+      </header>
+      <div class="scroll-content form-content">
+        <div class="icon-picker" id="form-icon">📁</div>
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" id="form-name" placeholder="Enter name">
+        </div>
+        <div class="form-group" id="form-balance-group">
+          <label>Initial Balance</label>
+          <input type="number" id="form-balance" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label>Currency</label>
+          <select id="form-currency"></select>
+        </div>
+        <input type="hidden" id="form-type">
+        <input type="hidden" id="form-id">
+      </div>
+    </div>
+
+    <!-- Pickers -->
+    <div class="modal" id="picker-modal" onclick="if(event.target===this)app.closeModal()">
+      <div class="modal-content">
+        <h3 id="picker-title">Select</h3>
+        <div id="picker-list"></div>
+      </div>
+    </div>
+
+    <div class="modal" id="date-modal" onclick="if(event.target===this)app.closeModal()">
+      <div class="modal-content">
+        <h3>Select Date</h3>
+        <input type="date" id="modal-date-input">
+        <button class="btn-primary" onclick="app.confirmDate()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
