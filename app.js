@@ -1,8 +1,8 @@
 // ==================== CONFIG ====================
 // REPLACE THESE WITH YOUR REAL SUPABASE CREDENTIALS
 // If you leave the placeholders, the app works fine in offline/localStorage mode
-const SUPABASE_URL = 'https://your-project.supabase.co';
-const SUPABASE_KEY = 'your-anon-key';
+const SUPABASE_URL = 'https://xmbzdeizupztebxsvgic.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtYnpkZWl6dXB6dGVieHN2Z2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4MDc4NzIsImV4cCI6MjA5MjM4Mzg3Mn0.RQVYC88Ou1O8X0mVLwfn3uj91M2p0hhhsWORXwbQEzE';
 
 let supabase = null;
 let useSupabase = false;
