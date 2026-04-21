@@ -1,6 +1,13 @@
+// ==================== DIAGNOSTICS ====================
+console.log('=== APP.JS STARTED ===');
+window.onerror = function(msg, url, line) {
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ef4444;color:#fff;z-index:99999;padding:12px;font-size:14px;font-family:monospace;white-space:pre-wrap;';
+  div.textContent = 'JS ERROR at line ' + line + ': ' + msg;
+  document.body.appendChild(div);
+};
+
 // ==================== CONFIG ====================
-// REPLACE THESE WITH YOUR REAL SUPABASE CREDENTIALS
-// If you leave the placeholders, the app works fine in offline/localStorage mode
 const SUPABASE_URL = 'https://xmbzdeizupztebxsvgic.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtYnpkZWl6dXB6dGVieHN2Z2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4MDc4NzIsImV4cCI6MjA5MjM4Mzg3Mn0.RQVYC88Ou1O8X0mVLwfn3uj91M2p0hhhsWORXwbQEzE';
 
@@ -8,12 +15,25 @@ let supabase = null;
 let useSupabase = false;
 
 try {
-  if (!SUPABASE_URL.includes('your-project') && !SUPABASE_KEY.includes('your-anon') && window.supabase) {
+  if (window.supabase) {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     useSupabase = true;
+    console.log('Supabase connected');
+  } else {
+    console.log('Supabase CDN not loaded');
   }
 } catch (e) {
   console.error('Supabase init failed:', e);
+}
+
+// Polyfill crypto.randomUUID
+if (!crypto.randomUUID) {
+  crypto.randomUUID = function() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  };
 }
 
 // ==================== STORAGE ====================
@@ -120,21 +140,28 @@ async function syncToSupabase(table, data, id) {
 
 // ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', () => {
-  populateCurrencySelects();
-  refreshRates(false).then(() => {
+  console.log('=== DOM READY ===');
+  try {
+    populateCurrencySelects();
     renderDashboard();
-  });
-  setupServiceWorker();
-  setupIconPicker();
+    refreshRates(false).then(() => {
+      renderDashboard();
+      console.log('Rates refreshed');
+    }).catch(e => console.log('Rates error:', e));
+    setupServiceWorker();
+    setupIconPicker();
 
-  // Show offline banner if Supabase not connected
-  if (!useSupabase) {
-    const banner = document.createElement('div');
-    banner.id = 'offline-banner';
-    banner.innerHTML = '⚠️ Offline Mode — Add your Supabase credentials in app.js to enable cloud sync';
-    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#000;text-align:center;padding:8px;font-size:13px;font-weight:600;z-index:9999;';
-    document.body.appendChild(banner);
-    setTimeout(() => { if (banner.parentNode) banner.parentNode.removeChild(banner); }, 6000);
+    if (!useSupabase) {
+      const banner = document.createElement('div');
+      banner.innerHTML = '⚠️ Offline Mode — data saved locally';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#000;text-align:center;padding:8px;font-size:13px;font-weight:600;z-index:9999;';
+      document.body.appendChild(banner);
+      setTimeout(() => { if (banner.parentNode) banner.parentNode.removeChild(banner); }, 5000);
+    }
+    console.log('=== INIT COMPLETE ===');
+  } catch (e) {
+    console.error('INIT CRASH:', e);
+    alert('App failed to start: ' + e.message);
   }
 });
 
@@ -160,6 +187,9 @@ async function refreshRates(force) {
 
 function setupServiceWorker() {
   if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(reg => reg.update());
+    });
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 }
@@ -177,6 +207,7 @@ function setupIconPicker() {
 
 // ==================== DASHBOARD ====================
 function renderDashboard() {
+  console.log('renderDashboard called, accounts:', state.accounts.length, 'categories:', state.categories.length);
   const period = getPeriodRange();
   const periodTx = state.transactions.filter(t => {
     const d = new Date(t.date + 'T00:00:00');
@@ -194,7 +225,6 @@ function renderDashboard() {
   if (expEl) expEl.textContent = formatMoney(expenses, state.settings?.default_currency || 'USD');
   if (incEl) incEl.textContent = formatMoney(income, state.settings?.default_currency || 'USD');
 
-  // Accounts grid
   const accGrid = document.getElementById('accounts-grid');
   if (accGrid) {
     accGrid.innerHTML = state.accounts.map(a => `
@@ -211,7 +241,6 @@ function renderDashboard() {
     `;
   }
 
-  // Categories grid
   const catGrid = document.getElementById('categories-grid');
   if (catGrid) {
     const catTotals = {};
@@ -370,7 +399,7 @@ function calcBackspace() {
 
 function calcClear() {
   state.calc.amount = '0';
-  state.calcOpBuffer = null;
+  calcOpBuffer = null;
   updateCalcUI();
 }
 
@@ -456,7 +485,6 @@ async function saveTransaction() {
     state.transactions.unshift(data);
   }
 
-  // Update account balance
   const acc = state.accounts.find(a => a.id === state.calc.accountId);
   if (acc) {
     const oldTx = state.calc.editingId ? state.transactions.find(t => t.id === state.calc.editingId) : null;
@@ -486,7 +514,6 @@ function openList(filterType, id) {
 
 function renderList() {
   let txs = [...state.transactions];
-
   if (state.filters.accountId) txs = txs.filter(t => t.account_id === state.filters.accountId);
   if (state.filters.categoryId) txs = txs.filter(t => t.category_id === state.filters.categoryId);
   if (state.filters.tag) txs = txs.filter(t => (t.tags || []).includes(state.filters.tag));
@@ -762,3 +789,5 @@ window.app = {
   openForm, saveForm,
   showAccountPicker, showCategoryPicker, closeModal, pickerAction
 };
+
+console.log('=== APP.JS FULLY PARSED ===');
