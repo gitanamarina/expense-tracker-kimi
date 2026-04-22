@@ -9,6 +9,7 @@
   <title>Expense Tracker</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💰%3C/text%3E%3C/svg%3E">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root { --bg:#0f0f0f; --surface:#1a1a1a; --surface-light:#2a2a2a; --border:#333; --text:#fff; --text-secondary:#a0a0a0; --accent-yellow:#f59e0b; --accent-green:#10b981; --accent-red:#ef4444; --accent-blue:#3b82f6; --safe-top:env(safe-area-inset-top); --safe-bottom:env(safe-area-inset-bottom); }
     * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -292,7 +293,72 @@
         try { localStorage.setItem('et_' + key, JSON.stringify(val)); } catch (e) {}
       }
     };
+const SUPABASE_URL = 'https://xmbzdeizupztebxsvgic.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtYnpkZWl6dXB6dGVieHN2Z2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4MDc4NzIsImV4cCI6MjA5MjM4Mzg3Mn0.RQVYC88Ou1O8X0mVLwfn3uj91M2p0hhhsWORXwbQEzE';
 
+let supabase = null;
+let useSupabase = false;
+
+try {
+  if (window.supabase) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    useSupabase = true;
+  }
+} catch (e) {
+  console.error('Supabase init failed:', e);
+}
+
+async function syncToSupabase() {
+  if (!useSupabase || !supabase) return;
+  try {
+    for (const acc of state.accounts) {
+      await supabase.from('accounts').upsert(acc, { onConflict: 'id' });
+    }
+    for (const cat of state.categories) {
+      await supabase.from('categories').upsert(cat, { onConflict: 'id' });
+    }
+    for (const tx of state.transactions) {
+      await supabase.from('transactions').upsert(tx, { onConflict: 'id' });
+    }
+    const { data: existing } = await supabase.from('settings').select('id').maybeSingle();
+    if (existing) {
+      const settingsToSave = { ...state.settings, id: existing.id };
+      await supabase.from('settings').update(settingsToSave).eq('id', existing.id);
+    }
+  } catch (e) {
+    console.log('Sync error:', e);
+  }
+}
+
+async function loadFromSupabase() {
+  if (!useSupabase || !supabase) return;
+  try {
+    const [{ data: accounts }, { data: categories }, { data: transactions }, { data: settingsRow }] = await Promise.all([
+      supabase.from('accounts').select('*'),
+      supabase.from('categories').select('*'),
+      supabase.from('transactions').select('*').order('date', { ascending: false }),
+      supabase.from('settings').select('*').maybeSingle()
+    ]);
+    
+    let hasCloudData = false;
+    if (accounts && accounts.length) { state.accounts = accounts; hasCloudData = true; }
+    if (categories && categories.length) { state.categories = categories; hasCloudData = true; }
+    if (transactions && transactions.length) { state.transactions = transactions; hasCloudData = true; }
+    if (settingsRow) { state.settings = settingsRow; hasCloudData = true; }
+    
+    if (hasCloudData) {
+      storage.set('accounts', state.accounts);
+      storage.set('categories', state.categories);
+      storage.set('transactions', state.transactions);
+      storage.set('settings', state.settings);
+      renderDashboard();
+    } else {
+      await syncToSupabase();
+    }
+  } catch (e) {
+    console.log('Cloud load failed:', e);
+  }
+}
     const CURRENCIES = ['USD','EUR','GBP','MXN','RUB','AED','AUD','CAD','CHF','CNY','JPY','KRW','VND','THB','BRL','ARS','COP','PEN','CLP','BTC','ETH'];
     const ICONS = ['💳','💵','🏦','📱','🚗','🏠','🍔','🛒','👗','✈️','🎮','💊','🎓','🐶','🎁','💼','🚕','🚌','🚲','⛽','🍺','☕','🍕','🥑','🏥','🦷','💇','🧴','🛍️','📚','🎬','🏋️','🎵','🌱','🔧','💡','🌐','📊','🏖️','🛏️','🧹','👶','🎄','🎂','❤️','⭐','🔥','⚡','🌙','🌞'];
 
@@ -354,13 +420,14 @@
       window.scrollTo(0, 0);
     }
 
-    function saveState() {
-      storage.set('accounts', state.accounts);
-      storage.set('categories', state.categories);
-      storage.set('transactions', state.transactions);
-      storage.set('settings', state.settings);
-      storage.set('rates', state.rates);
-    }
+ function saveState() {
+  storage.set('accounts', state.accounts);
+  storage.set('categories', state.categories);
+  storage.set('transactions', state.transactions);
+  storage.set('settings', state.settings);
+  storage.set('rates', state.rates);
+  syncToSupabase();
+}
 
     function populateCurrencySelects() {
       document.querySelectorAll('select').forEach(sel => {
@@ -927,13 +994,14 @@
     });
 
     document.addEventListener('DOMContentLoaded', () => {
-      populateCurrencySelects();
-      renderDashboard();
-      fetch('https://open.er-api.com/v6/latest/USD')
-        .then(r => r.json())
-        .then(data => { if (data.rates) { state.rates = data.rates; storage.set('rates', state.rates); renderDashboard(); }})
-        .catch(() => {});
-    });
+  populateCurrencySelects();
+  renderDashboard();
+  fetch('https://open.er-api.com/v6/latest/USD')
+    .then(r => r.json())
+    .then(data => { if (data.rates) { state.rates = data.rates; storage.set('rates', state.rates); renderDashboard(); }})
+    .catch(() => {});
+  loadFromSupabase();
+});
 
     window.app = {
       showDashboard: () => { renderDashboard(); showScreen('dashboard'); },
