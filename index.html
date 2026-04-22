@@ -9,7 +9,7 @@
   <title>Expense Tracker</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💰%3C/text%3E%3C/svg%3E">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root { --bg:#0f0f0f; --surface:#1a1a1a; --surface-light:#2a2a2a; --border:#333; --text:#fff; --text-secondary:#a0a0a0; --accent-yellow:#f59e0b; --accent-green:#10b981; --accent-red:#ef4444; --accent-blue:#3b82f6; --safe-top:env(safe-area-inset-top); --safe-bottom:env(safe-area-inset-bottom); }
     * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -26,9 +26,10 @@
     .stat-value.income { color:var(--accent-green); }
     .icon-btn { background:none; border:none; color:var(--text); font-size:20px; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
     .grid-section { margin-bottom:20px; }
-    .grid-section h3 { font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; padding-left:4px; }
+    .grid-section h3 { font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; padding-left:4px; display:flex; justify-content:space-between; align-items:center; }
+    .grid-section h3 .section-total { color:var(--text); font-size:14px; text-transform:none; letter-spacing:0; }
     .icon-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; }
-    .icon-item { display:flex; flex-direction:column; align-items:center; cursor:pointer; }
+    .icon-item { display:flex; flex-direction:column; align-items:center; cursor:pointer; position:relative; user-select:none; -webkit-user-select:none; }
     .icon-circle { width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; background:var(--surface-light); border:2px solid transparent; transition:transform 0.1s; }
     .icon-item:active .icon-circle { transform:scale(0.95); }
     .account-item .icon-circle { background:rgba(245,158,11,0.15); border-color:var(--accent-yellow); }
@@ -39,11 +40,13 @@
     .icon-amount { font-size:10px; margin-top:1px; font-weight:600; }
     .account-item .icon-amount { color:var(--accent-yellow); }
     .category-item .icon-amount { color:var(--accent-green); }
+    .income-item .icon-amount { color:var(--accent-blue); }
     .fab { position:fixed; bottom:calc(20px + var(--safe-bottom)); right:20px; width:52px; height:52px; border-radius:50%; background:var(--accent-green); color:white; border:none; font-size:24px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.4); cursor:pointer; z-index:10; }
     .calc-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; }
     .calc-close, .calc-check { background:none; border:none; color:var(--text); font-size:20px; width:44px; height:44px; cursor:pointer; }
     .calc-selectors { display:flex; align-items:center; gap:6px; font-size:14px; }
     .calc-selectors button { background:none; border:none; color:var(--text-secondary); font-size:14px; cursor:pointer; padding:4px 6px; }
+    .calc-selectors button.hidden { display:none; }
     .calc-tags { display:flex; flex-wrap:wrap; gap:6px; padding:8px 16px; min-height:40px; flex-shrink:0; }
     .tag-pill { background:var(--surface-light); border:1px solid var(--border); color:var(--text-secondary); padding:3px 10px; border-radius:14px; font-size:12px; cursor:pointer; }
     .tag-pill.active { background:var(--accent-blue); color:white; border-color:var(--accent-blue); }
@@ -90,6 +93,7 @@
     .form-group small { display:block; margin-top:3px; font-size:11px; color:var(--text-secondary); }
     .icon-picker { width:72px; height:72px; border-radius:50%; border:2px dashed var(--border); display:flex; align-items:center; justify-content:center; font-size:32px; margin:0 auto 20px; cursor:pointer; background:var(--surface-light); }
     .btn-primary { width:100%; padding:14px; background:var(--accent-green); color:white; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; margin-top:6px; }
+    .btn-danger { width:100%; padding:14px; background:var(--accent-red); color:white; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; margin-top:12px; }
     .btn-secondary { width:100%; padding:12px; background:var(--surface-light); color:var(--text); border:1px solid var(--border); border-radius:10px; font-size:14px; cursor:pointer; }
     .report-filters { padding:14px; }
     .filter-group { margin-bottom:14px; }
@@ -108,6 +112,8 @@
     .report-summary-row { display:flex; justify-content:space-between; margin-bottom:6px; font-size:14px; }
     .report-summary-row:last-child { margin-bottom:0; }
     #offline-banner { position:fixed; top:0; left:0; right:0; background:#f59e0b; color:#000; text-align:center; padding:6px; font-size:12px; font-weight:600; z-index:9999; }
+    .long-press-hint { position:absolute; top:-4px; right:-4px; background:var(--accent-blue); color:white; font-size:10px; width:18px; height:18px; border-radius:50%; display:none; align-items:center; justify-content:center; }
+    .icon-item.editing .long-press-hint { display:flex; }
   </style>
 </head>
 <body>
@@ -125,11 +131,12 @@
       </header>
       <div class="scroll-content">
         <section class="grid-section">
-          <h3>Income</h3>
+          <h3>Income <span class="section-total" id="income-total"></span></h3>
           <div class="icon-grid" id="income-grid">
             <div class="icon-item income-item" onclick="app.openCalculator('income')">
               <div class="icon-circle income-bg">💵</div>
               <span class="icon-label">Add Income</span>
+              <span class="icon-amount" id="income-amount">$0</span>
             </div>
           </div>
         </section>
@@ -151,7 +158,7 @@
         <button class="calc-close" onclick="app.showDashboard()">✕</button>
         <div class="calc-selectors">
           <button id="calc-account-btn" onclick="app.showAccountPicker()">Account</button>
-          <span>›</span>
+          <span id="calc-separator">›</span>
           <button id="calc-category-btn" onclick="app.showCategoryPicker()">Category</button>
         </div>
         <button class="calc-check" onclick="app.saveTransaction()">✓</button>
@@ -259,6 +266,7 @@
         <div class="form-group" id="form-balance-group"><label>Initial Balance</label><input type="number" id="form-balance" placeholder="0"></div>
         <div class="form-group"><label>Currency</label><select id="form-currency"></select></div>
         <input type="hidden" id="form-type"><input type="hidden" id="form-id">
+        <button class="btn-danger" id="form-delete-btn" onclick="app.deleteForm()" style="display:none;">Delete</button>
       </div>
     </div>
 
@@ -272,6 +280,7 @@
   </div>
 
   <script>
+    // Polyfill
     if (!window.crypto || !crypto.randomUUID) {
       window.crypto = window.crypto || {};
       crypto.randomUUID = function() {
@@ -282,6 +291,86 @@
       };
     }
 
+    // Supabase
+    const SUPABASE_URL = 'https://xmbzdeizupztebxsvgic.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtYnpkZWl6dXB6dGVieHN2Z2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4MDc4NzIsImV4cCI6MjA5MjM4Mzg3Mn0.RQVYC88Ou1O8X0mVLwfn3uj91M2p0hhhsWORXwbQEzE';
+
+    let supabase = null;
+    let useSupabase = false;
+
+    function initSupabase() {
+      if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+        try {
+          supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+          useSupabase = true;
+          console.log('Supabase connected');
+          loadFromSupabase();
+        } catch (e) {
+          console.error('Supabase init error:', e);
+        }
+      } else {
+        setTimeout(initSupabase, 200);
+      }
+    }
+
+    async function syncToSupabase() {
+      if (!useSupabase || !supabase) return;
+      try {
+        if (state.accounts.length) {
+          const { error } = await supabase.from('accounts').upsert(state.accounts, { onConflict: 'id' });
+          if (error) console.log('Accounts sync error:', error.message);
+        }
+        if (state.categories.length) {
+          const { error } = await supabase.from('categories').upsert(state.categories, { onConflict: 'id' });
+          if (error) console.log('Categories sync error:', error.message);
+        }
+        if (state.transactions.length) {
+          const { error } = await supabase.from('transactions').upsert(state.transactions, { onConflict: 'id' });
+          if (error) console.log('Transactions sync error:', error.message);
+        }
+        const { data: existing } = await supabase.from('settings').select('id').limit(1);
+        if (existing && existing.length) {
+          await supabase.from('settings').update(state.settings).eq('id', existing[0].id);
+        }
+        console.log('Sync complete');
+      } catch (e) {
+        console.error('Sync error:', e);
+      }
+    }
+
+    async function loadFromSupabase() {
+      if (!useSupabase || !supabase) return;
+      try {
+        const [{ data: accounts }, { data: categories }, { data: transactions }, { data: settingsData }] = await Promise.all([
+          supabase.from('accounts').select('*'),
+          supabase.from('categories').select('*'),
+          supabase.from('transactions').select('*').order('date', { ascending: false }),
+          supabase.from('settings').select('*').limit(1)
+        ]);
+        
+        let hasCloudData = false;
+        if (accounts && accounts.length) { state.accounts = accounts; hasCloudData = true; }
+        if (categories && categories.length) { state.categories = categories; hasCloudData = true; }
+        if (transactions && transactions.length) { state.transactions = transactions; hasCloudData = true; }
+        if (settingsData && settingsData.length) { state.settings = settingsData[0]; hasCloudData = true; }
+        
+        if (hasCloudData) {
+          storage.set('accounts', state.accounts);
+          storage.set('categories', state.categories);
+          storage.set('transactions', state.transactions);
+          storage.set('settings', state.settings);
+          renderDashboard();
+          console.log('Loaded from cloud');
+        } else {
+          console.log('No cloud data, syncing local up');
+          await syncToSupabase();
+        }
+      } catch (e) {
+        console.log('Cloud load failed:', e);
+      }
+    }
+
+    // Storage
     const storage = {
       get(key, def) {
         try {
@@ -293,72 +382,7 @@
         try { localStorage.setItem('et_' + key, JSON.stringify(val)); } catch (e) {}
       }
     };
-const SUPABASE_URL = 'https://xmbzdeizupztebxsvgic.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtYnpkZWl6dXB6dGVieHN2Z2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4MDc4NzIsImV4cCI6MjA5MjM4Mzg3Mn0.RQVYC88Ou1O8X0mVLwfn3uj91M2p0hhhsWORXwbQEzE';
 
-let supabase = null;
-let useSupabase = false;
-
-try {
-  if (window.supabase) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    useSupabase = true;
-  }
-} catch (e) {
-  console.error('Supabase init failed:', e);
-}
-
-async function syncToSupabase() {
-  if (!useSupabase || !supabase) return;
-  try {
-    for (const acc of state.accounts) {
-      await supabase.from('accounts').upsert(acc, { onConflict: 'id' });
-    }
-    for (const cat of state.categories) {
-      await supabase.from('categories').upsert(cat, { onConflict: 'id' });
-    }
-    for (const tx of state.transactions) {
-      await supabase.from('transactions').upsert(tx, { onConflict: 'id' });
-    }
-    const { data: existing } = await supabase.from('settings').select('id').maybeSingle();
-    if (existing) {
-      const settingsToSave = { ...state.settings, id: existing.id };
-      await supabase.from('settings').update(settingsToSave).eq('id', existing.id);
-    }
-  } catch (e) {
-    console.log('Sync error:', e);
-  }
-}
-
-async function loadFromSupabase() {
-  if (!useSupabase || !supabase) return;
-  try {
-    const [{ data: accounts }, { data: categories }, { data: transactions }, { data: settingsRow }] = await Promise.all([
-      supabase.from('accounts').select('*'),
-      supabase.from('categories').select('*'),
-      supabase.from('transactions').select('*').order('date', { ascending: false }),
-      supabase.from('settings').select('*').maybeSingle()
-    ]);
-    
-    let hasCloudData = false;
-    if (accounts && accounts.length) { state.accounts = accounts; hasCloudData = true; }
-    if (categories && categories.length) { state.categories = categories; hasCloudData = true; }
-    if (transactions && transactions.length) { state.transactions = transactions; hasCloudData = true; }
-    if (settingsRow) { state.settings = settingsRow; hasCloudData = true; }
-    
-    if (hasCloudData) {
-      storage.set('accounts', state.accounts);
-      storage.set('categories', state.categories);
-      storage.set('transactions', state.transactions);
-      storage.set('settings', state.settings);
-      renderDashboard();
-    } else {
-      await syncToSupabase();
-    }
-  } catch (e) {
-    console.log('Cloud load failed:', e);
-  }
-}
     const CURRENCIES = ['USD','EUR','GBP','MXN','RUB','AED','AUD','CAD','CHF','CNY','JPY','KRW','VND','THB','BRL','ARS','COP','PEN','CLP','BTC','ETH'];
     const ICONS = ['💳','💵','🏦','📱','🚗','🏠','🍔','🛒','👗','✈️','🎮','💊','🎓','🐶','🎁','💼','🚕','🚌','🚲','⛽','🍺','☕','🍕','🥑','🏥','🦷','💇','🧴','🛍️','📚','🎬','🏋️','🎵','🌱','🔧','💡','🌐','📊','🏖️','🛏️','🧹','👶','🎄','🎂','❤️','⭐','🔥','⚡','🌙','🌞'];
 
@@ -420,14 +444,14 @@ async function loadFromSupabase() {
       window.scrollTo(0, 0);
     }
 
- function saveState() {
-  storage.set('accounts', state.accounts);
-  storage.set('categories', state.categories);
-  storage.set('transactions', state.transactions);
-  storage.set('settings', state.settings);
-  storage.set('rates', state.rates);
-  syncToSupabase();
-}
+    function saveState() {
+      storage.set('accounts', state.accounts);
+      storage.set('categories', state.categories);
+      storage.set('transactions', state.transactions);
+      storage.set('settings', state.settings);
+      storage.set('rates', state.rates);
+      syncToSupabase();
+    }
 
     function populateCurrencySelects() {
       document.querySelectorAll('select').forEach(sel => {
@@ -435,6 +459,18 @@ async function loadFromSupabase() {
           sel.innerHTML = CURRENCIES.map(c => `<option value="${c}">${c}</option>`).join('');
         }
       });
+    }
+
+    function attachLongPress(el, callback) {
+      let timer = null;
+      const start = (e) => { timer = setTimeout(() => { callback(); }, 600); };
+      const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+      el.addEventListener('touchstart', start, {passive: true});
+      el.addEventListener('touchend', cancel);
+      el.addEventListener('touchmove', cancel);
+      el.addEventListener('mousedown', start);
+      el.addEventListener('mouseup', cancel);
+      el.addEventListener('mouseleave', cancel);
     }
 
     function renderDashboard() {
@@ -455,15 +491,21 @@ async function loadFromSupabase() {
       if (expEl) expEl.textContent = formatMoney(expenses, state.settings?.default_currency || 'USD');
       if (incEl) incEl.textContent = formatMoney(income, state.settings?.default_currency || 'USD');
 
+      const incAmtEl = document.getElementById('income-amount');
+      if (incAmtEl) incAmtEl.textContent = formatMoney(income, state.settings?.default_currency || 'USD');
+
       const accGrid = document.getElementById('accounts-grid');
       if (accGrid) {
-        let html = state.accounts.map(a => `
-          <div class="icon-item account-item" onclick="app.openList('account','${a.id}')">
-            <div class="icon-circle">${a.icon || '💳'}</div>
-            <span class="icon-label">${a.name.replace(/</g,'&lt;')}</span>
-            <span class="icon-amount">${formatMoney(a.balance || 0, a.currency || 'USD')}</span>
-          </div>
-        `).join('');
+        let html = state.accounts.map(a => {
+          const divId = 'acc-' + a.id;
+          return `
+            <div class="icon-item account-item" id="${divId}" onclick="app.openList('account','${a.id}')">
+              <div class="icon-circle">${a.icon || '💳'}</div>
+              <span class="icon-label">${a.name.replace(/</g,'&lt;')}</span>
+              <span class="icon-amount">${formatMoney(a.balance || 0, a.currency || 'USD')}</span>
+            </div>
+          `;
+        }).join('');
         html += `
           <div class="icon-item add-btn" onclick="app.openForm('account')">
             <div class="icon-circle">＋</div>
@@ -471,6 +513,10 @@ async function loadFromSupabase() {
           </div>
         `;
         accGrid.innerHTML = html;
+        state.accounts.forEach(a => {
+          const el = document.getElementById('acc-' + a.id);
+          if (el) attachLongPress(el, () => app.openForm('account', a.id));
+        });
       }
 
       const catGrid = document.getElementById('categories-grid');
@@ -479,13 +525,16 @@ async function loadFromSupabase() {
         periodTx.filter(t => t.type === 'expense').forEach(t => {
           catTotals[t.category_id] = (catTotals[t.category_id] || 0) + (t.converted_amount || t.amount);
         });
-        let html = state.categories.map(c => `
-          <div class="icon-item category-item" onclick="app.openList('category','${c.id}')">
-            <div class="icon-circle">${c.icon || '📁'}</div>
-            <span class="icon-label">${c.name.replace(/</g,'&lt;')}</span>
-            <span class="icon-amount">${formatMoney(catTotals[c.id] || 0, state.settings?.default_currency || 'USD')}</span>
-          </div>
-        `).join('');
+        let html = state.categories.map(c => {
+          const divId = 'cat-' + c.id;
+          return `
+            <div class="icon-item category-item" id="${divId}" onclick="app.openList('category','${c.id}')">
+              <div class="icon-circle">${c.icon || '📁'}</div>
+              <span class="icon-label">${c.name.replace(/</g,'&lt;')}</span>
+              <span class="icon-amount">${formatMoney(catTotals[c.id] || 0, state.settings?.default_currency || 'USD')}</span>
+            </div>
+          `;
+        }).join('');
         html += `
           <div class="icon-item add-btn" onclick="app.openForm('category')">
             <div class="icon-circle">＋</div>
@@ -493,6 +542,10 @@ async function loadFromSupabase() {
           </div>
         `;
         catGrid.innerHTML = html;
+        state.categories.forEach(c => {
+          const el = document.getElementById('cat-' + c.id);
+          if (el) attachLongPress(el, () => app.openForm('category', c.id));
+        });
       }
     }
 
@@ -509,7 +562,11 @@ async function loadFromSupabase() {
         note: '',
         editingId: null
       };
-      if (typeOrIncome === 'income') state.calc.type = 'income';
+
+      if (typeOrIncome === 'income') {
+        state.calc.type = 'income';
+        state.calc.categoryId = null;
+      }
       if (preselectId && typeOrIncome === 'account') {
         state.calc.accountId = preselectId;
         const acc = state.accounts.find(a => a.id === preselectId);
@@ -520,6 +577,7 @@ async function loadFromSupabase() {
         const cat = state.categories.find(c => c.id === preselectId);
         if (cat) state.calc.currency = cat.currency || defCurrency;
       }
+
       updateCalcUI();
       showScreen('calculator');
     }
@@ -547,8 +605,18 @@ async function loadFromSupabase() {
       const cat = state.categories.find(c => c.id === state.calc.categoryId);
       const accBtn = document.getElementById('calc-account-btn');
       const catBtn = document.getElementById('calc-category-btn');
+      const sep = document.getElementById('calc-separator');
+      
       if (accBtn) accBtn.textContent = acc?.name || 'Account';
-      if (catBtn) catBtn.textContent = cat?.name || 'Category';
+      
+      if (state.calc.type === 'income') {
+        if (catBtn) catBtn.classList.add('hidden');
+        if (sep) sep.style.display = 'none';
+      } else {
+        if (catBtn) { catBtn.classList.remove('hidden'); catBtn.textContent = cat?.name || 'Category'; }
+        if (sep) sep.style.display = 'inline';
+      }
+
       const amtEl = document.getElementById('calc-amount');
       const curEl = document.getElementById('calc-currency');
       if (amtEl) amtEl.textContent = state.calc.amount;
@@ -581,439 +649,4 @@ async function loadFromSupabase() {
       return Array.from(tags).sort();
     }
 
-    function toggleTag(tag) {
-      if (state.calc.tags.includes(tag)) state.calc.tags = state.calc.tags.filter(t => t !== tag);
-      else state.calc.tags.push(tag);
-      updateCalcUI();
-    }
-
-    function addTagPrompt() {
-      const tag = prompt('Enter tag name:');
-      if (tag && tag.trim()) {
-        const clean = tag.trim().toLowerCase().replace(/\s+/g, '-');
-        if (!state.calc.tags.includes(clean)) state.calc.tags.push(clean);
-        updateCalcUI();
-      }
-    }
-
-    function setType(type) {
-      state.calc.type = type;
-      updateCalcUI();
-    }
-
-    function calcDigit(d) {
-      if (state.calc.amount === '0') state.calc.amount = d.toString();
-      else state.calc.amount += d;
-      updateCalcUI();
-    }
-
-    function calcDecimal() {
-      if (!state.calc.amount.includes('.')) state.calc.amount += '.';
-      updateCalcUI();
-    }
-
-    function calcBackspace() {
-      state.calc.amount = state.calc.amount.slice(0, -1) || '0';
-      updateCalcUI();
-    }
-
-    function calcClear() {
-      state.calc.amount = '0';
-      calcOpBuffer = null;
-      updateCalcUI();
-    }
-
-    let calcOpBuffer = null;
-    function calcOp(op) {
-      calcOpBuffer = { amount: parseFloat(state.calc.amount) || 0, op };
-      state.calc.amount = '0';
-    }
-
-    function calcPercent() {
-      state.calc.amount = ((parseFloat(state.calc.amount) || 0) * 0.01).toString();
-      updateCalcUI();
-    }
-
-    function calcEquals() {
-      if (!calcOpBuffer) return;
-      const current = parseFloat(state.calc.amount) || 0;
-      let result = 0;
-      switch (calcOpBuffer.op) {
-        case '+': result = calcOpBuffer.amount + current; break;
-        case '-': result = calcOpBuffer.amount - current; break;
-        case '×': result = calcOpBuffer.amount * current; break;
-        case '÷': result = calcOpBuffer.amount / current; break;
-      }
-      state.calc.amount = parseFloat(result.toFixed(2)).toString();
-      calcOpBuffer = null;
-      updateCalcUI();
-    }
-
-    function calcNote() {
-      const note = prompt('Note:', state.calc.note);
-      if (note !== null) state.calc.note = note;
-    }
-
-    function setDate(when) {
-      const d = new Date();
-      if (when === 'yesterday') d.setDate(d.getDate() - 1);
-      state.calc.date = d.toISOString().split('T')[0];
-      updateCalcUI();
-    }
-
-    function showDatePicker() {
-      const input = document.getElementById('modal-date-input');
-      if (input) input.value = state.calc.date;
-      const modal = document.getElementById('date-modal');
-      if (modal) modal.classList.add('active');
-    }
-
-    function confirmDate() {
-      const input = document.getElementById('modal-date-input');
-      if (input) state.calc.date = input.value;
-      closeModal();
-      updateCalcUI();
-    }
-
-    function showCurrencyPicker() {
-      const items = CURRENCIES.map(c => ({
-        icon: '💱',
-        label: c,
-        action: () => { state.calc.currency = c; updateCalcUI(); }
-      }));
-      showPicker('Select Currency', items);
-    }
-
-    function saveTransaction() {
-      const amount = parseFloat(state.calc.amount);
-      if (!amount || amount <= 0) { alert('Enter amount'); return; }
-      if (!state.calc.accountId) { alert('Select account'); return; }
-      if (!state.calc.categoryId) { alert('Select category'); return; }
-
-      const converted = convertAmount(amount, state.calc.currency, state.settings?.default_currency || 'USD');
-      const id = state.calc.editingId || crypto.randomUUID();
-
-      const data = {
-        id: id,
-        account_id: state.calc.accountId,
-        category_id: state.calc.categoryId,
-        amount: amount,
-        currency: state.calc.currency,
-        converted_amount: converted,
-        type: state.calc.type,
-        tags: state.calc.tags,
-        date: state.calc.date,
-        note: state.calc.note,
-        created_at: new Date().toISOString()
-      };
-
-      if (state.calc.editingId) {
-        const idx = state.transactions.findIndex(t => t.id === state.calc.editingId);
-        if (idx >= 0) state.transactions[idx] = data;
-      } else {
-        state.transactions.unshift(data);
-      }
-
-      const acc = state.accounts.find(a => a.id === state.calc.accountId);
-      if (acc) {
-        const oldTx = state.calc.editingId ? state.transactions.find(t => t.id === state.calc.editingId) : null;
-        let change = state.calc.type === 'income' ? amount : -amount;
-        if (oldTx && oldTx.account_id === acc.id) {
-          const oldChange = oldTx.type === 'income' ? oldTx.amount : -oldTx.amount;
-          acc.balance = (acc.balance || 0) - oldChange + change;
-        } else {
-          acc.balance = (acc.balance || 0) + change;
-        }
-      }
-
-      saveState();
-      renderDashboard();
-      showScreen('dashboard');
-    }
-
-    function openList(filterType, id) {
-      state.filters = { accountId: null, categoryId: null, tag: null, from: null, to: null };
-      if (filterType === 'account') state.filters.accountId = id;
-      if (filterType === 'category') state.filters.categoryId = id;
-      renderList();
-      showScreen('list');
-    }
-
-    function renderList() {
-      let txs = [...state.transactions];
-      if (state.filters.accountId) txs = txs.filter(t => t.account_id === state.filters.accountId);
-      if (state.filters.categoryId) txs = txs.filter(t => t.category_id === state.filters.categoryId);
-      if (state.filters.tag) txs = txs.filter(t => (t.tags || []).includes(state.filters.tag));
-      if (state.filters.from) txs = txs.filter(t => t.date >= state.filters.from);
-      if (state.filters.to) txs = txs.filter(t => t.date <= state.filters.to);
-
-      const chips = document.getElementById('filter-chips');
-      if (chips) {
-        const html = [];
-        if (state.filters.accountId) {
-          const a = state.accounts.find(x => x.id === state.filters.accountId);
-          html.push(`<span class="chip">${(a?.name || '').replace(/</g,'&lt;')} <button onclick="app.clearFilter('account')">×</button></span>`);
-        }
-        if (state.filters.categoryId) {
-          const c = state.categories.find(x => x.id === state.filters.categoryId);
-          html.push(`<span class="chip">${(c?.name || '').replace(/</g,'&lt;')} <button onclick="app.clearFilter('category')">×</button></span>`);
-        }
-        chips.innerHTML = html.join('') || '<span style="color:var(--text-secondary);font-size:13px;">All transactions</span>';
-      }
-
-      const total = txs.reduce((s, t) => s + (t.type === 'income' ? 1 : -1) * (t.converted_amount || t.amount), 0);
-      const totalEl = document.getElementById('list-total');
-      if (totalEl) {
-        totalEl.innerHTML = `<span>TOTAL</span><span class="amount" style="color:${total >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">${formatMoney(Math.abs(total), state.settings?.default_currency || 'USD')}</span>`;
-      }
-
-      const groups = {};
-      txs.forEach(t => { if (!groups[t.date]) groups[t.date] = []; groups[t.date].push(t); });
-      const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
-
-      const container = document.getElementById('transaction-list');
-      if (!container) return;
-      if (sortedDates.length === 0) {
-        container.innerHTML = '<div class="empty-state">No transactions</div>';
-        return;
-      }
-
-      container.innerHTML = sortedDates.map(date => {
-        const dayTxs = groups[date];
-        const dayTotal = dayTxs.reduce((s, t) => s + (t.type === 'income' ? 1 : -1) * (t.converted_amount || t.amount), 0);
-        return `
-          <div class="date-group">
-            <div class="date-header">${formatDate(date)}</div>
-            ${dayTxs.map(t => renderTxItem(t)).join('')}
-            <div class="daily-total">Total: ${formatMoney(Math.abs(dayTotal), state.settings?.default_currency || 'USD')}</div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function renderTxItem(t) {
-      const acc = state.accounts.find(a => a.id === t.account_id);
-      const cat = state.categories.find(c => c.id === t.category_id);
-      const isExp = t.type === 'expense';
-      return `
-        <div class="transaction-item" onclick="app.editTransaction('${t.id}')">
-          <div class="tx-left">
-            <span class="tx-account">${(acc?.name || 'Unknown').replace(/</g,'&lt;')}</span>
-            <span class="tx-category">${(cat?.name || 'Unknown').replace(/</g,'&lt;')}</span>
-            ${(t.tags && t.tags.length) ? `<span class="tx-tags">${t.tags.map(tag => '#' + tag.replace(/</g,'&lt;')).join(' ')}</span>` : ''}
-          </div>
-          <div class="tx-right">
-            <div class="tx-amount ${isExp ? 'expense' : 'income'}">${isExp ? '-' : '+'}${formatMoney(t.amount, t.currency)}</div>
-            ${t.converted_amount && t.currency !== (state.settings?.default_currency || 'USD') ? `<div class="tx-converted">≈ ${formatMoney(t.converted_amount, state.settings?.default_currency || 'USD')}</div>` : ''}
-          </div>
-        </div>
-      `;
-    }
-
-    function clearFilter(type) {
-      if (type === 'account') state.filters.accountId = null;
-      if (type === 'category') state.filters.categoryId = null;
-      renderList();
-    }
-
-    function showDateRangePicker() {
-      const from = prompt('From date (YYYY-MM-DD):', state.filters.from || '');
-      if (from === null) return;
-      const to = prompt('To date (YYYY-MM-DD):', state.filters.to || '');
-      if (to === null) return;
-      state.filters.from = from || null;
-      state.filters.to = to || null;
-      renderList();
-    }
-
-    function openReports() {
-      const accContainer = document.getElementById('report-accounts');
-      if (accContainer) accContainer.innerHTML = state.accounts.map(a => `<span class="select-pill" onclick="app.toggleReportFilter('accounts','${a.id}',this)">${a.name.replace(/</g,'&lt;')}</span>`).join('');
-      const catContainer = document.getElementById('report-categories');
-      if (catContainer) catContainer.innerHTML = state.categories.map(c => `<span class="select-pill" onclick="app.toggleReportFilter('categories','${c.id}',this)">${c.name.replace(/</g,'&lt;')}</span>`).join('');
-      const allTags = getAllTags();
-      const tagContainer = document.getElementById('report-tags');
-      if (tagContainer) tagContainer.innerHTML = allTags.map(tag => `<span class="select-pill" onclick="app.toggleReportFilter('tags','${tag}',this)">#${tag.replace(/</g,'&lt;')}</span>`).join('');
-      const period = getPeriodRange();
-      const fromInput = document.getElementById('report-from');
-      const toInput = document.getElementById('report-to');
-      if (fromInput) fromInput.value = period.start.toISOString().split('T')[0];
-      if (toInput) toInput.value = period.end.toISOString().split('T')[0];
-      const results = document.getElementById('report-results');
-      if (results) results.innerHTML = '';
-      showScreen('reports');
-    }
-
-    function toggleReportFilter(type, value, el) {
-      const arr = state.reportFilters[type];
-      if (arr.includes(value)) {
-        arr.splice(arr.indexOf(value), 1);
-        el.classList.remove('selected');
-      } else {
-        arr.push(value);
-        el.classList.add('selected');
-      }
-    }
-
-    function runReport() {
-      const from = document.getElementById('report-from')?.value;
-      const to = document.getElementById('report-to')?.value;
-      if (!from || !to) return;
-      let txs = state.transactions.filter(t => t.date >= from && t.date <= to);
-      if (state.reportFilters.accounts.length) txs = txs.filter(t => state.reportFilters.accounts.includes(t.account_id));
-      if (state.reportFilters.categories.length) txs = txs.filter(t => state.reportFilters.categories.includes(t.category_id));
-      if (state.reportFilters.tags.length) txs = txs.filter(t => state.reportFilters.tags.some(tag => (t.tags || []).includes(tag)));
-      const income = txs.filter(t => t.type === 'income').reduce((s, t) => s + (t.converted_amount || t.amount), 0);
-      const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + (t.converted_amount || t.amount), 0);
-      const results = document.getElementById('report-results');
-      if (!results) return;
-      results.innerHTML = `
-        <div class="report-summary">
-          <div class="report-summary-row"><span>Transactions</span><span>${txs.length}</span></div>
-          <div class="report-summary-row"><span>Income</span><span style="color:var(--accent-green)">${formatMoney(income, state.settings?.default_currency || 'USD')}</span></div>
-          <div class="report-summary-row"><span>Expenses</span><span style="color:var(--accent-red)">${formatMoney(expenses, state.settings?.default_currency || 'USD')}</span></div>
-          <div class="report-summary-row"><span>Net</span><span style="color:${income >= expenses ? 'var(--accent-green)' : 'var(--accent-red)'}">${formatMoney(income - expenses, state.settings?.default_currency || 'USD')}</span></div>
-        </div>
-        ${txs.length ? txs.map(t => renderTxItem(t)).join('') : '<div class="empty-state">No results</div>'}
-      `;
-    }
-
-    function openSettings() {
-      const dayInput = document.getElementById('setting-period-day');
-      const curInput = document.getElementById('setting-currency');
-      if (dayInput) dayInput.value = state.settings?.period_start_day || 1;
-      if (curInput) curInput.value = state.settings?.default_currency || 'USD';
-      showScreen('settings');
-    }
-
-    function saveSettings() {
-      const day = parseInt(document.getElementById('setting-period-day')?.value) || 1;
-      const currency = document.getElementById('setting-currency')?.value || 'USD';
-      state.settings = { ...(state.settings || {}), period_start_day: day, default_currency: currency };
-      saveState();
-      renderDashboard();
-      showScreen('dashboard');
-    }
-
-    function openForm(type, id) {
-      document.getElementById('form-type').value = type;
-      document.getElementById('form-id').value = id || '';
-      document.getElementById('form-title').textContent = id ? 'Edit' : 'Add ' + type;
-      document.getElementById('form-name').value = '';
-      document.getElementById('form-balance').value = '';
-      document.getElementById('form-icon').textContent = type === 'account' ? '💳' : '📁';
-      document.getElementById('form-currency').value = state.settings?.default_currency || 'USD';
-      document.getElementById('form-balance-group').style.display = type === 'category' ? 'none' : 'block';
-      if (id) {
-        const item = type === 'account' ? state.accounts.find(a => a.id === id) : state.categories.find(c => c.id === id);
-        if (item) {
-          document.getElementById('form-name').value = item.name;
-          document.getElementById('form-icon').textContent = item.icon || (type === 'account' ? '💳' : '📁');
-          document.getElementById('form-currency').value = item.currency || state.settings?.default_currency || 'USD';
-          if (type === 'account') document.getElementById('form-balance').value = item.balance || 0;
-        }
-      }
-      showScreen('form');
-    }
-
-    function saveForm() {
-      const type = document.getElementById('form-type').value;
-      const id = document.getElementById('form-id').value;
-      const name = document.getElementById('form-name').value.trim();
-      const icon = document.getElementById('form-icon').textContent;
-      const currency = document.getElementById('form-currency').value;
-      if (!name) { alert('Enter name'); return; }
-      const isEdit = !!id;
-      const itemId = id || crypto.randomUUID();
-      const data = { id: itemId, name, icon, currency, created_at: new Date().toISOString() };
-      if (type === 'account') {
-        data.balance = parseFloat(document.getElementById('form-balance').value) || 0;
-        if (isEdit) {
-          const idx = state.accounts.findIndex(a => a.id === id);
-          if (idx >= 0) state.accounts[idx] = { ...state.accounts[idx], ...data };
-        } else {
-          state.accounts.push(data);
-        }
-      } else {
-        if (isEdit) {
-          const idx = state.categories.findIndex(c => c.id === id);
-          if (idx >= 0) state.categories[idx] = { ...state.categories[idx], ...data };
-        } else {
-          state.categories.push(data);
-        }
-      }
-      saveState();
-      renderDashboard();
-      showScreen('dashboard');
-    }
-
-    function showAccountPicker() {
-      const items = state.accounts.map(a => ({
-        icon: a.icon || '💳',
-        label: a.name,
-        action: () => { state.calc.accountId = a.id; state.calc.currency = a.currency || state.settings?.default_currency || 'USD'; updateCalcUI(); }
-      }));
-      showPicker('Select Account', items);
-    }
-
-    function showCategoryPicker() {
-      const items = state.categories.map(c => ({
-        icon: c.icon || '📁',
-        label: c.name,
-        action: () => { state.calc.categoryId = c.id; updateCalcUI(); }
-      }));
-      showPicker('Select Category', items);
-    }
-
-    function showPicker(title, items) {
-      document.getElementById('picker-title').textContent = title;
-      document.getElementById('picker-list').innerHTML = items.map((item, i) => `
-        <div class="picker-item" onclick="app.pickerAction(${i})">
-          <span style="font-size:24px">${item.icon}</span>
-          <span>${item.label.replace(/</g,'&lt;')}</span>
-        </div>
-      `).join('');
-      window._pickerActions = items.map(i => i.action);
-      document.getElementById('picker-modal').classList.add('active');
-    }
-
-    function pickerAction(index) {
-      if (window._pickerActions && window._pickerActions[index]) window._pickerActions[index]();
-      closeModal();
-    }
-
-    function closeModal() {
-      document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
-    }
-
-    document.getElementById('form-icon').addEventListener('click', () => {
-      const html = ICONS.map(ic => `<div class="picker-item" onclick="document.getElementById('form-icon').textContent='${ic}';app.closeModal()"><span style="font-size:28px">${ic}</span></div>`).join('');
-      document.getElementById('picker-title').textContent = 'Choose Icon';
-      document.getElementById('picker-list').innerHTML = html;
-      document.getElementById('picker-modal').classList.add('active');
-    });
-
-    document.addEventListener('DOMContentLoaded', () => {
-  populateCurrencySelects();
-  renderDashboard();
-  fetch('https://open.er-api.com/v6/latest/USD')
-    .then(r => r.json())
-    .then(data => { if (data.rates) { state.rates = data.rates; storage.set('rates', state.rates); renderDashboard(); }})
-    .catch(() => {});
-  loadFromSupabase();
-});
-
-    window.app = {
-      showDashboard: () => { renderDashboard(); showScreen('dashboard'); },
-      openCalculator, editTransaction, setType, toggleTag, addTagPrompt,
-      calcDigit, calcDecimal, calcBackspace, calcClear, calcOp, calcPercent, calcEquals, calcNote,
-      setDate, showDatePicker, confirmDate, saveTransaction,
-      openList, clearFilter, showDateRangePicker,
-      openReports, toggleReportFilter, runReport,
-      openSettings, saveSettings,
-      openForm, saveForm,
-      showAccountPicker, showCategoryPicker, showCurrencyPicker, closeModal, pickerAction
-    };
-  </script>
-</body>
-</html>
+    function toggleTag
