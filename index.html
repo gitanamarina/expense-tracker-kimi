@@ -9,7 +9,7 @@
   <title>Expense Tracker</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💰%3C/text%3E%3C/svg%3E">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
   <style>
     :root { --bg:#0f0f0f; --surface:#1a1a1a; --surface-light:#2a2a2a; --border:#333; --text:#fff; --text-secondary:#a0a0a0; --accent-yellow:#f59e0b; --accent-green:#10b981; --accent-red:#ef4444; --accent-blue:#3b82f6; --safe-top:env(safe-area-inset-top); --safe-bottom:env(safe-area-inset-bottom); }
     * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -108,7 +108,10 @@
     .report-summary-row { display:flex; justify-content:space-between; margin-bottom:6px; font-size:14px; }
     .report-summary-row:last-child { margin-bottom:0; }
     #offline-banner { position:fixed; top:0; left:0; right:0; background:#f59e0b; color:#000; text-align:center; padding:6px; font-size:12px; font-weight:600; z-index:9999; }
+      .form-group select { width:100%; background:var(--surface-light); border:1px solid var(--border); color:var(--text); padding:12px 14px; border-radius:10px; font-size:16px; outline:none; }
+    .form-group select:focus { border-color:var(--accent-green); }
   </style>
+<base target="_blank">
 </head>
 <body>
   <div id="app">
@@ -151,7 +154,7 @@
         <button class="calc-close" onclick="app.showDashboard()">✕</button>
         <div class="calc-selectors">
           <button id="calc-account-btn" onclick="app.showAccountPicker()">Account</button>
-          <span>›</span>
+          <span id="calc-arrow">›</span>
           <button id="calc-category-btn" onclick="app.showCategoryPicker()">Category</button>
         </div>
         <button class="calc-check" onclick="app.saveTransaction()">✓</button>
@@ -243,6 +246,12 @@
           <select id="setting-currency"></select>
         </div>
         <button class="btn-primary" onclick="app.saveSettings()">Save Settings</button>
+        <hr style="border:none;border-top:1px solid var(--border);margin:24px 0;">
+        <h3 style="font-size:14px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:12px;">Backup & Restore</h3>
+        <button class="btn-primary" style="background:var(--accent-blue);margin-bottom:10px;" onclick="app.exportData()">📤 Export Data (JSON)</button>
+        <button class="btn-secondary" onclick="document.getElementById('import-file').click()">📥 Import Data (JSON)</button>
+        <input type="file" id="import-file" accept=".json" style="display:none;" onchange="app.importData(this)">
+        <small style="display:block;margin-top:8px;color:var(--text-secondary);">Export creates a backup file you can save to Files/iCloud. Import restores from that file.</small>
       </div>
     </div>
 
@@ -293,72 +302,6 @@
         try { localStorage.setItem('et_' + key, JSON.stringify(val)); } catch (e) {}
       }
     };
-const SUPABASE_URL = 'https://xmbzdeizupztebxsvgic.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtYnpkZWl6dXB6dGVieHN2Z2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4MDc4NzIsImV4cCI6MjA5MjM4Mzg3Mn0.RQVYC88Ou1O8X0mVLwfn3uj91M2p0hhhsWORXwbQEzE';
-
-let supabase = null;
-let useSupabase = false;
-
-try {
-  if (window.supabase) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    useSupabase = true;
-  }
-} catch (e) {
-  console.error('Supabase init failed:', e);
-}
-
-async function syncToSupabase() {
-  if (!useSupabase || !supabase) return;
-  try {
-    for (const acc of state.accounts) {
-      await supabase.from('accounts').upsert(acc, { onConflict: 'id' });
-    }
-    for (const cat of state.categories) {
-      await supabase.from('categories').upsert(cat, { onConflict: 'id' });
-    }
-    for (const tx of state.transactions) {
-      await supabase.from('transactions').upsert(tx, { onConflict: 'id' });
-    }
-    const { data: existing } = await supabase.from('settings').select('id').maybeSingle();
-    if (existing) {
-      const settingsToSave = { ...state.settings, id: existing.id };
-      await supabase.from('settings').update(settingsToSave).eq('id', existing.id);
-    }
-  } catch (e) {
-    console.log('Sync error:', e);
-  }
-}
-
-async function loadFromSupabase() {
-  if (!useSupabase || !supabase) return;
-  try {
-    const [{ data: accounts }, { data: categories }, { data: transactions }, { data: settingsRow }] = await Promise.all([
-      supabase.from('accounts').select('*'),
-      supabase.from('categories').select('*'),
-      supabase.from('transactions').select('*').order('date', { ascending: false }),
-      supabase.from('settings').select('*').maybeSingle()
-    ]);
-    
-    let hasCloudData = false;
-    if (accounts && accounts.length) { state.accounts = accounts; hasCloudData = true; }
-    if (categories && categories.length) { state.categories = categories; hasCloudData = true; }
-    if (transactions && transactions.length) { state.transactions = transactions; hasCloudData = true; }
-    if (settingsRow) { state.settings = settingsRow; hasCloudData = true; }
-    
-    if (hasCloudData) {
-      storage.set('accounts', state.accounts);
-      storage.set('categories', state.categories);
-      storage.set('transactions', state.transactions);
-      storage.set('settings', state.settings);
-      renderDashboard();
-    } else {
-      await syncToSupabase();
-    }
-  } catch (e) {
-    console.log('Cloud load failed:', e);
-  }
-}
     const CURRENCIES = ['USD','EUR','GBP','MXN','RUB','AED','AUD','CAD','CHF','CNY','JPY','KRW','VND','THB','BRL','ARS','COP','PEN','CLP','BTC','ETH'];
     const ICONS = ['💳','💵','🏦','📱','🚗','🏠','🍔','🛒','👗','✈️','🎮','💊','🎓','🐶','🎁','💼','🚕','🚌','🚲','⛽','🍺','☕','🍕','🥑','🏥','🦷','💇','🧴','🛍️','📚','🎬','🏋️','🎵','🌱','🔧','💡','🌐','📊','🏖️','🛏️','🧹','👶','🎄','🎂','❤️','⭐','🔥','⚡','🌙','🌞'];
 
@@ -426,7 +369,6 @@ async function loadFromSupabase() {
   storage.set('transactions', state.transactions);
   storage.set('settings', state.settings);
   storage.set('rates', state.rates);
-  syncToSupabase();
 }
 
     function populateCurrencySelects() {
@@ -455,15 +397,32 @@ async function loadFromSupabase() {
       if (expEl) expEl.textContent = formatMoney(expenses, state.settings?.default_currency || 'USD');
       if (incEl) incEl.textContent = formatMoney(income, state.settings?.default_currency || 'USD');
 
+      const incGrid = document.getElementById('income-grid');
+      if (incGrid) {
+        incGrid.innerHTML = `
+          <div class="icon-item income-item" onclick="app.openIncomeFlow()">
+            <div class="icon-circle income-bg">💵</div>
+            <span class="icon-label">Add Income</span>
+            <span class="icon-amount" style="color:var(--accent-blue)">${formatMoney(income, state.settings?.default_currency || 'USD')}</span>
+          </div>
+        `;
+      }
+
       const accGrid = document.getElementById('accounts-grid');
       if (accGrid) {
         let html = state.accounts.map(a => `
-          <div class="icon-item account-item" onclick="app.openList('account','${a.id}')">
+          <div class="icon-item account-item" data-id="${a.id}" onclick="app.openList('account','${a.id}')">
             <div class="icon-circle">${a.icon || '💳'}</div>
             <span class="icon-label">${a.name.replace(/</g,'&lt;')}</span>
             <span class="icon-amount">${formatMoney(a.balance || 0, a.currency || 'USD')}</span>
           </div>
         `).join('');
+        html += `
+          <div class="icon-item" onclick="app.openTransfer()">
+            <div class="icon-circle" style="background:rgba(139,92,246,0.15);border-color:#8b5cf6;">🔄</div>
+            <span class="icon-label">Transfer</span>
+          </div>
+        `;
         html += `
           <div class="icon-item add-btn" onclick="app.openForm('account')">
             <div class="icon-circle">＋</div>
@@ -480,7 +439,7 @@ async function loadFromSupabase() {
           catTotals[t.category_id] = (catTotals[t.category_id] || 0) + (t.converted_amount || t.amount);
         });
         let html = state.categories.map(c => `
-          <div class="icon-item category-item" onclick="app.openList('category','${c.id}')">
+          <div class="icon-item category-item" data-id="${c.id}" onclick="app.openList('category','${c.id}')">
             <div class="icon-circle">${c.icon || '📁'}</div>
             <span class="icon-label">${c.name.replace(/</g,'&lt;')}</span>
             <span class="icon-amount">${formatMoney(catTotals[c.id] || 0, state.settings?.default_currency || 'USD')}</span>
@@ -494,8 +453,8 @@ async function loadFromSupabase() {
         `;
         catGrid.innerHTML = html;
       }
+      attachItemListeners();
     }
-
     function openCalculator(typeOrIncome, preselectId) {
       const defCurrency = state.settings?.default_currency || 'USD';
       state.calc = {
@@ -509,7 +468,16 @@ async function loadFromSupabase() {
         note: '',
         editingId: null
       };
-      if (typeOrIncome === 'income') state.calc.type = 'income';
+      if (typeOrIncome === 'income') {
+        state.calc.type = 'income';
+        let incCat = state.categories.find(c => c.name === 'Income');
+        if (!incCat) {
+          incCat = { id: crypto.randomUUID(), name: 'Income', icon: '💵', currency: defCurrency, created_at: new Date().toISOString() };
+          state.categories.push(incCat);
+          saveState();
+        }
+        state.calc.categoryId = incCat.id;
+      }
       if (preselectId && typeOrIncome === 'account') {
         state.calc.accountId = preselectId;
         const acc = state.accounts.find(a => a.id === preselectId);
@@ -524,6 +492,17 @@ async function loadFromSupabase() {
       showScreen('calculator');
     }
 
+    function openIncomeFlow() {
+      const items = state.accounts.map(a => ({
+        icon: a.icon || '💳',
+        label: a.name,
+        action: () => {
+          app.closeModal();
+          app.openCalculator('income', a.id);
+        }
+      }));
+      showPicker('Add Income To', items);
+    }
     function editTransaction(id) {
       const t = state.transactions.find(x => x.id === id);
       if (!t) return;
@@ -547,8 +526,17 @@ async function loadFromSupabase() {
       const cat = state.categories.find(c => c.id === state.calc.categoryId);
       const accBtn = document.getElementById('calc-account-btn');
       const catBtn = document.getElementById('calc-category-btn');
-      if (accBtn) accBtn.textContent = acc?.name || 'Account';
-      if (catBtn) catBtn.textContent = cat?.name || 'Category';
+      const arrow = document.getElementById('calc-arrow');
+      if (state.calc.type === 'income') {
+        if (accBtn) accBtn.textContent = acc?.name || 'Account';
+        if (catBtn) catBtn.style.display = 'none';
+        if (arrow) arrow.style.display = 'none';
+      } else {
+        if (catBtn) catBtn.style.display = '';
+        if (arrow) arrow.style.display = '';
+        if (accBtn) accBtn.textContent = acc?.name || 'Account';
+        if (catBtn) catBtn.textContent = cat?.name || 'Category';
+      }
       const amtEl = document.getElementById('calc-amount');
       const curEl = document.getElementById('calc-currency');
       if (amtEl) amtEl.textContent = state.calc.amount;
@@ -572,7 +560,6 @@ async function loadFromSupabase() {
         `).join('');
       }
     }
-
     function getAllTags() {
       const tags = new Set();
       state.transactions.forEach(t => {
@@ -688,7 +675,7 @@ async function loadFromSupabase() {
       const amount = parseFloat(state.calc.amount);
       if (!amount || amount <= 0) { alert('Enter amount'); return; }
       if (!state.calc.accountId) { alert('Select account'); return; }
-      if (!state.calc.categoryId) { alert('Select category'); return; }
+      if (state.calc.type !== 'income' && !state.calc.categoryId) { alert('Select category'); return; }
 
       const converted = convertAmount(amount, state.calc.currency, state.settings?.default_currency || 'USD');
       const id = state.calc.editingId || crypto.randomUUID();
@@ -707,30 +694,32 @@ async function loadFromSupabase() {
         created_at: new Date().toISOString()
       };
 
+      let oldTx = null;
       if (state.calc.editingId) {
+        oldTx = state.transactions.find(t => t.id === state.calc.editingId);
         const idx = state.transactions.findIndex(t => t.id === state.calc.editingId);
         if (idx >= 0) state.transactions[idx] = data;
       } else {
         state.transactions.unshift(data);
       }
 
+      if (oldTx) {
+        const oldAcc = state.accounts.find(a => a.id === oldTx.account_id);
+        if (oldAcc) {
+          const oldChange = oldTx.type === 'income' ? oldTx.amount : -oldTx.amount;
+          oldAcc.balance = (oldAcc.balance || 0) - oldChange;
+        }
+      }
       const acc = state.accounts.find(a => a.id === state.calc.accountId);
       if (acc) {
-        const oldTx = state.calc.editingId ? state.transactions.find(t => t.id === state.calc.editingId) : null;
-        let change = state.calc.type === 'income' ? amount : -amount;
-        if (oldTx && oldTx.account_id === acc.id) {
-          const oldChange = oldTx.type === 'income' ? oldTx.amount : -oldTx.amount;
-          acc.balance = (acc.balance || 0) - oldChange + change;
-        } else {
-          acc.balance = (acc.balance || 0) + change;
-        }
+        const change = state.calc.type === 'income' ? amount : -amount;
+        acc.balance = (acc.balance || 0) + change;
       }
 
       saveState();
       renderDashboard();
       showScreen('dashboard');
     }
-
     function openList(filterType, id) {
       state.filters = { accountId: null, categoryId: null, tag: null, from: null, to: null };
       if (filterType === 'account') state.filters.accountId = id;
@@ -826,7 +815,128 @@ async function loadFromSupabase() {
       renderList();
     }
 
+
+    function attachItemListeners() {
+      document.querySelectorAll('#accounts-grid .icon-item.account-item').forEach(el => {
+        const id = el.getAttribute('data-id');
+        if (!id) return;
+        el.addEventListener('contextmenu', (e) => { e.preventDefault(); app.showItemMenu('account', id); });
+        let timer;
+        const start = (e) => { timer = setTimeout(() => app.showItemMenu('account', id), 600); };
+        const cancel = () => clearTimeout(timer);
+        el.addEventListener('touchstart', start, {passive: true});
+        el.addEventListener('touchend', cancel);
+        el.addEventListener('touchmove', cancel);
+      });
+      document.querySelectorAll('#categories-grid .icon-item.category-item').forEach(el => {
+        const id = el.getAttribute('data-id');
+        if (!id) return;
+        el.addEventListener('contextmenu', (e) => { e.preventDefault(); app.showItemMenu('category', id); });
+        let timer;
+        const start = (e) => { timer = setTimeout(() => app.showItemMenu('category', id), 600); };
+        const cancel = () => clearTimeout(timer);
+        el.addEventListener('touchstart', start, {passive: true});
+        el.addEventListener('touchend', cancel);
+        el.addEventListener('touchmove', cancel);
+      });
+    }
+
+    function showItemMenu(type, id) {
+      const item = type === 'account' ? state.accounts.find(a => a.id === id) : state.categories.find(c => c.id === id);
+      if (!item) return;
+      const items = [
+        { icon: '✏️', label: 'Edit', action: () => { app.closeModal(); app.openForm(type, id); } },
+        { icon: '🗑️', label: 'Delete', action: () => { app.closeModal(); app.deleteItem(type, id); } }
+      ];
+      showPicker(item.name, items);
+    }
+
+    function deleteItem(type, id) {
+      if (!confirm('Delete this ' + type + '? Transactions will remain but show as Unknown.')) return;
+      if (type === 'account') {
+        state.accounts = state.accounts.filter(a => a.id !== id);
+      } else {
+        state.categories = state.categories.filter(c => c.id !== id);
+      }
+      saveState();
+      renderDashboard();
+    }
+
+    function openTransfer() {
+      const fromSel = document.getElementById('transfer-from');
+      const toSel = document.getElementById('transfer-to');
+      const curSel = document.getElementById('transfer-currency');
+      if (!fromSel || !toSel) return;
+      const opts = state.accounts.map(a => `<option value="${a.id}">${a.icon || '💳'} ${a.name.replace(/</g,'&lt;')}</option>`).join('');
+      fromSel.innerHTML = '<option value="">Select source</option>' + opts;
+      toSel.innerHTML = '<option value="">Select destination</option>' + opts;
+      if (curSel) {
+        curSel.innerHTML = CURRENCIES.map(c => `<option value="${c}">${c}</option>`).join('');
+        curSel.value = state.settings?.default_currency || 'USD';
+      }
+      document.getElementById('transfer-amount').value = '';
+      document.getElementById('transfer-modal').classList.add('active');
+    }
+
+    function saveTransfer() {
+      const fromId = document.getElementById('transfer-from')?.value;
+      const toId = document.getElementById('transfer-to')?.value;
+      const amount = parseFloat(document.getElementById('transfer-amount')?.value);
+      const currency = document.getElementById('transfer-currency')?.value || state.settings?.default_currency || 'USD';
+      if (!fromId || !toId) { alert('Select both accounts'); return; }
+      if (fromId === toId) { alert('Cannot transfer to same account'); return; }
+      if (!amount || amount <= 0) { alert('Enter amount'); return; }
+
+      const fromAcc = state.accounts.find(a => a.id === fromId);
+      const toAcc = state.accounts.find(a => a.id === toId);
+      if (!fromAcc || !toAcc) return;
+
+      let txCat = state.categories.find(c => c.name === 'Transfer');
+      if (!txCat) {
+        txCat = { id: crypto.randomUUID(), name: 'Transfer', icon: '🔄', currency: state.settings?.default_currency || 'USD', created_at: new Date().toISOString() };
+        state.categories.push(txCat);
+      }
+
+      const date = new Date().toISOString().split('T')[0];
+      const converted = convertAmount(amount, currency, state.settings?.default_currency || 'USD');
+
+      fromAcc.balance = (fromAcc.balance || 0) - amount;
+      state.transactions.unshift({
+        id: crypto.randomUUID(),
+        account_id: fromId,
+        category_id: txCat.id,
+        amount: amount,
+        currency: currency,
+        converted_amount: converted,
+        type: 'expense',
+        tags: ['transfer'],
+        date: date,
+        note: 'To: ' + toAcc.name,
+        created_at: new Date().toISOString()
+      });
+
+      toAcc.balance = (toAcc.balance || 0) + amount;
+      state.transactions.unshift({
+        id: crypto.randomUUID(),
+        account_id: toId,
+        category_id: txCat.id,
+        amount: amount,
+        currency: currency,
+        converted_amount: converted,
+        type: 'income',
+        tags: ['transfer'],
+        date: date,
+        note: 'From: ' + fromAcc.name,
+        created_at: new Date().toISOString()
+      });
+
+      saveState();
+      renderDashboard();
+      app.closeModal();
+    }
+
     function openReports() {
+      state.reportFilters = { accounts: [], categories: [], tags: [], from: '', to: '' };
       const accContainer = document.getElementById('report-accounts');
       if (accContainer) accContainer.innerHTML = state.accounts.map(a => `<span class="select-pill" onclick="app.toggleReportFilter('accounts','${a.id}',this)">${a.name.replace(/</g,'&lt;')}</span>`).join('');
       const catContainer = document.getElementById('report-categories');
@@ -843,7 +953,6 @@ async function loadFromSupabase() {
       if (results) results.innerHTML = '';
       showScreen('reports');
     }
-
     function toggleReportFilter(type, value, el) {
       const arr = state.reportFilters[type];
       if (arr.includes(value)) {
@@ -865,19 +974,78 @@ async function loadFromSupabase() {
       if (state.reportFilters.tags.length) txs = txs.filter(t => state.reportFilters.tags.some(tag => (t.tags || []).includes(tag)));
       const income = txs.filter(t => t.type === 'income').reduce((s, t) => s + (t.converted_amount || t.amount), 0);
       const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + (t.converted_amount || t.amount), 0);
+
+      const byCategory = {};
+      txs.forEach(t => {
+        const cat = state.categories.find(c => c.id === t.category_id);
+        const key = cat ? cat.name : 'Unknown';
+        if (!byCategory[key]) byCategory[key] = { income: 0, expense: 0 };
+        byCategory[key][t.type] += (t.converted_amount || t.amount);
+      });
+
+      const byAccount = {};
+      txs.forEach(t => {
+        const acc = state.accounts.find(a => a.id === t.account_id);
+        const key = acc ? acc.name : 'Unknown';
+        if (!byAccount[key]) byAccount[key] = { income: 0, expense: 0 };
+        byAccount[key][t.type] += (t.converted_amount || t.amount);
+      });
+
+      const byTag = {};
+      txs.forEach(t => {
+        (t.tags || []).forEach(tag => {
+          if (!byTag[tag]) byTag[tag] = 0;
+          byTag[tag] += (t.converted_amount || t.amount);
+        });
+      });
+
       const results = document.getElementById('report-results');
       if (!results) return;
-      results.innerHTML = `
+
+      let html = `
         <div class="report-summary">
           <div class="report-summary-row"><span>Transactions</span><span>${txs.length}</span></div>
           <div class="report-summary-row"><span>Income</span><span style="color:var(--accent-green)">${formatMoney(income, state.settings?.default_currency || 'USD')}</span></div>
           <div class="report-summary-row"><span>Expenses</span><span style="color:var(--accent-red)">${formatMoney(expenses, state.settings?.default_currency || 'USD')}</span></div>
           <div class="report-summary-row"><span>Net</span><span style="color:${income >= expenses ? 'var(--accent-green)' : 'var(--accent-red)'}">${formatMoney(income - expenses, state.settings?.default_currency || 'USD')}</span></div>
         </div>
-        ${txs.length ? txs.map(t => renderTxItem(t)).join('') : '<div class="empty-state">No results</div>'}
       `;
-    }
 
+      if (Object.keys(byCategory).length) {
+        html += `<h3 style="margin:16px 0 8px;font-size:14px;color:var(--text-secondary);text-transform:uppercase;">By Category</h3>`;
+        html += Object.entries(byCategory).map(([name, data]) => `
+          <div class="report-summary-row" style="padding:6px 0;border-bottom:1px solid var(--border);">
+            <span>${name.replace(/</g,'&lt;')}</span>
+            <span>${formatMoney(data.expense, state.settings?.default_currency || 'USD')} <span style="color:var(--accent-green)">+${formatMoney(data.income, state.settings?.default_currency || 'USD')}</span></span>
+          </div>
+        `).join('');
+      }
+
+      if (Object.keys(byAccount).length) {
+        html += `<h3 style="margin:16px 0 8px;font-size:14px;color:var(--text-secondary);text-transform:uppercase;">By Account</h3>`;
+        html += Object.entries(byAccount).map(([name, data]) => `
+          <div class="report-summary-row" style="padding:6px 0;border-bottom:1px solid var(--border);">
+            <span>${name.replace(/</g,'&lt;')}</span>
+            <span>${formatMoney(data.expense, state.settings?.default_currency || 'USD')} <span style="color:var(--accent-green)">+${formatMoney(data.income, state.settings?.default_currency || 'USD')}</span></span>
+          </div>
+        `).join('');
+      }
+
+      if (Object.keys(byTag).length) {
+        html += `<h3 style="margin:16px 0 8px;font-size:14px;color:var(--text-secondary);text-transform:uppercase;">By Tag</h3>`;
+        html += Object.entries(byTag).map(([tag, amount]) => `
+          <div class="report-summary-row" style="padding:6px 0;border-bottom:1px solid var(--border);">
+            <span>#${tag.replace(/</g,'&lt;')}</span>
+            <span>${formatMoney(amount, state.settings?.default_currency || 'USD')}</span>
+          </div>
+        `).join('');
+      }
+
+      html += `<h3 style="margin:16px 0 8px;font-size:14px;color:var(--text-secondary);text-transform:uppercase;">Transactions</h3>`;
+      html += txs.length ? txs.map(t => renderTxItem(t)).join('') : '<div class="empty-state">No results</div>';
+
+      results.innerHTML = html;
+    }
     function openSettings() {
       const dayInput = document.getElementById('setting-period-day');
       const curInput = document.getElementById('setting-currency');
@@ -1000,8 +1168,56 @@ async function loadFromSupabase() {
     .then(r => r.json())
     .then(data => { if (data.rates) { state.rates = data.rates; storage.set('rates', state.rates); renderDashboard(); }})
     .catch(() => {});
-  loadFromSupabase();
 });
+
+    function exportData() {
+      const data = {
+        accounts: state.accounts,
+        categories: state.categories,
+        transactions: state.transactions,
+        settings: state.settings,
+        rates: state.rates,
+        exported_at: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'expense-tracker-backup-' + new Date().toISOString().split('T')[0] + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function importData(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!data.accounts || !data.transactions) {
+            alert('Invalid backup file');
+            return;
+          }
+          if (!confirm('This will REPLACE all current data. Are you sure?')) return;
+          state.accounts = data.accounts || [];
+          state.categories = data.categories || [];
+          state.transactions = data.transactions || [];
+          state.settings = data.settings || state.settings;
+          state.rates = data.rates || state.rates;
+          saveState();
+          renderDashboard();
+          alert('Data restored successfully!');
+          showScreen('dashboard');
+        } catch (err) {
+          alert('Failed to read file: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+      input.value = '';
+    }
 
     window.app = {
       showDashboard: () => { renderDashboard(); showScreen('dashboard'); },
@@ -1012,8 +1228,22 @@ async function loadFromSupabase() {
       openReports, toggleReportFilter, runReport,
       openSettings, saveSettings,
       openForm, saveForm,
-      showAccountPicker, showCategoryPicker, showCurrencyPicker, closeModal, pickerAction
+      showAccountPicker, showCategoryPicker, showCurrencyPicker, closeModal, pickerAction,
+      openIncomeFlow, openTransfer, saveTransfer, showItemMenu, deleteItem,
+      exportData, importData
     };
   </script>
-</body>
+
+    <!-- Transfer Modal -->
+    <div class="modal" id="transfer-modal" onclick="if(event.target===this)app.closeModal()">
+      <div class="modal-content">
+        <h3>Transfer Money</h3>
+        <div class="form-group"><label>From</label><select id="transfer-from"><option value="">Select source</option></select></div>
+        <div class="form-group"><label>To</label><select id="transfer-to"><option value="">Select destination</option></select></div>
+        <div class="form-group"><label>Amount</label><input type="number" id="transfer-amount" placeholder="0"></div>
+        <div class="form-group"><label>Currency</label><select id="transfer-currency"></select></div>
+        <button class="btn-primary" onclick="app.saveTransfer()">Transfer</button>
+      </div>
+    </div>
+  </body>
 </html>
